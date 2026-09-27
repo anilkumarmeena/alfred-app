@@ -55,8 +55,8 @@ final class RemoteControls {
         MPNowPlayingInfoCenter.default().playbackState = .stopped
     }
 
-    /// Keeps the system's input mute in step with the app's, so the next stem press goes the right way and an
-    /// unmute from the screen isn't left silent.
+    /// Sets the system's input mute. VoiceSession only clears it (on unmute and at start), so an unmute from
+    /// the screen isn't left silent after an AirPods mute; setting it would play iOS's tone and echo back.
     func setSystemMuted(_ muted: Bool) {
         guard AVAudioApplication.shared.isInputMuted != muted else { return }
         do { try AVAudioApplication.shared.setInputMuted(muted) } catch { NSLog("JarvisAudio: setInputMuted: \(error)") }

@@ -104,7 +104,7 @@ final class VoiceSession: NSObject {
         // Keep the audio engine running between rooms too, so a reconnect in the background isn't suspended.
         try? await AudioManager.shared.setRecordingAlwaysPreparedMode(true)
         controls.enable()
-        controls.setSystemMuted(muted)
+        if !muted { controls.setSystemMuted(false) }
         watchNetwork()
         do {
             try await join(gen, first: true)
@@ -341,13 +341,15 @@ final class VoiceSession: NSObject {
     func setMuted(_ m: Bool, source: String) async throws -> Bool {
         guard wanted != nil else { throw Failure(code: "NOT_CONNECTED", message: "No session is running.") }
         muted = m
-        controls.setSystemMuted(m)
+        // Only ever unmuted here, never muted: iOS answers setInputMuted(true) with its mute tone, a restart of the
+        // input and a mute-state notification that came back as an earphone unmute, undoing every tap on Mute.
+        // The mic track below is the mute; the system's is cleared so an AirPods mute doesn't outlast an unmute.
+        if !m { controls.setSystemMuted(false) }
         // With no room yet (reconnecting) or a call holding the audio, the choice is kept and applied later.
         var opened = true
         if let r = room, connection == "connected", !interrupted { opened = await micOn(r, !m) }
         if !opened, !m {
             muted = true  // couldn't open the mic: stay muted and say so
-            controls.setSystemMuted(true)
             emit("mute", ["muted": true, "source": "system"])
             showNowPlaying()
             throw Failure(code: "NO_MICROPHONE", message: "The microphone couldn't start.")
@@ -362,11 +364,12 @@ final class VoiceSession: NSObject {
         switch p {
         case .system(let m):
             // The AirPods gesture: iOS has muted or unmuted the input already (and played its own tone).
-            // Our own setSystemMuted calls come back here too; those match already and are dropped.
-            guard m != muted else { return }
+            // Our own setSystemMuted(false) comes back here too, while unmuted, and is dropped. iOS muting the
+            // input while the app is already muted (from the screen) is a press meant to unmute.
+            guard m != muted || m else { return }
             presses.reset()
             _ = presses.accept(at: ProcessInfo.processInfo.systemUptime)  // swallow a remote command for the same press
-            Task { try? await setMuted(m, source: "earphone") }
+            Task { try? await setMuted(!muted, source: "earphone") }
         case .toggle:
             guard presses.accept(at: ProcessInfo.processInfo.systemUptime) else { return }
             Task {

@@ -65,8 +65,9 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   always prepared" mode keeps the engine running between rooms too, so a reconnect in the background isn't
   suspended while it waits.
 - Earphone button (`RemoteControls.swift`): on AirPods, iOS 17's mute gesture mutes the app's input itself and
-  reports it with `AVAudioApplication.inputMuteStateChangeNotification`. The plugin follows it, and keeps
-  `AVAudioApplication.setInputMuted` in step when the mute comes from the screen. Wired and other headsets send
+  reports it with `AVAudioApplication.inputMuteStateChangeNotification`. The plugin follows it, and clears
+  `AVAudioApplication.setInputMuted` when unmuting from the screen; it never sets it, since iOS answers that
+  with its own tone and a notification that undid the mute. Wired and other headsets send
   `MPRemoteCommandCenter` play, pause and toggle commands, which toggle the mute and play the page's
   falling or rising chime. The lock screen's Now Playing card shows Listening, Muted, Speaking and so on.
 - Interruptions: a call or Siri pauses the mic ("Mic paused"), and when it ends the session is reactivated.
