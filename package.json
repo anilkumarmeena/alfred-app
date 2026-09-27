@@ -16,6 +16,7 @@
     "build:ios-sim": "sh scripts/build-ios-sim.sh",
     "build:android": "cd android && ./gradlew assembleDebug",
     "check:web-patch": "sh scripts/check-web-patch.sh",
+    "check:server-patch": "sh scripts/check-server-patch.sh",
     "ios": "cap open ios",
     "android": "cap open android"
   },

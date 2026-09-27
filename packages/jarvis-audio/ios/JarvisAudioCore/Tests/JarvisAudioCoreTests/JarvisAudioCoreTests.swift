@@ -27,6 +27,81 @@ final class ServerAddressTests: XCTestCase {
         XCTAssertTrue(try ServerAddress("http://localhost:8787").isCleartext)
         XCTAssertFalse(try ServerAddress("mac.ts.net").isCleartext)
     }
+
+    func testPushURL() throws {
+        XCTAssertEqual(try ServerAddress("mac.ts.net").pushURL.absoluteString, "https://mac.ts.net/api/push/native")
+    }
+
+    func testNotificationPagesStayOnTheServer() throws {
+        let s = try ServerAddress("mac.ts.net")
+        XCTAssertEqual(s.page("/?task=3")?.absoluteString, "https://mac.ts.net/?task=3")
+        XCTAssertEqual(s.page("/?alert=calendar")?.absoluteString, "https://mac.ts.net/?alert=calendar")
+        XCTAssertEqual(s.page("https://MAC.ts.net/?task=4")?.absoluteString, "https://MAC.ts.net/?task=4")
+        XCTAssertNil(s.page("https://evil.example.com/?task=3"))
+        XCTAssertNil(s.page("//evil.example.com/x"))
+        XCTAssertNil(s.page("http://mac.ts.net/?task=3"))
+        XCTAssertNil(s.page("https://mac.ts.net:8443/"))
+        XCTAssertEqual(try ServerAddress("http://localhost:8787").page("/?task=1")?.absoluteString, "http://localhost:8787/?task=1")
+    }
+
+    func testNotificationPageCarriesItsTextLikeTheServiceWorker() throws {
+        let url = try XCTUnwrap(ServerAddress("mac.ts.net").page("/?task=3", title: "Task 3 is done", body: "C++ & more: 100%"))
+        XCTAssertEqual(url.query, "task=3")
+        var hash = URLComponents()
+        hash.percentEncodedQuery = url.fragment(percentEncoded: true)
+        XCTAssertEqual(hash.queryItems, [URLQueryItem(name: "title", value: "Task 3 is done"), URLQueryItem(name: "body", value: "C++ & more: 100%")])
+        XCTAssertFalse(url.fragment(percentEncoded: true)?.contains("+") ?? true)
+    }
+}
+
+final class PushRegistrationTests: XCTestCase {
+    private func data(_ s: String) -> Data { Data(s.utf8) }
+
+    private func profile(_ entitlements: String) -> Data {
+        // A signed profile's plist between binary CMS bytes, as in embedded.mobileprovision.
+        var d = Data([0x30, 0x82, 0x3c, 0x00, 0xff])
+        d.append(data("""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0"><dict><key>Name</key><string>iOS Team Provisioning Profile</string>
+            <key>Entitlements</key><dict>\(entitlements)</dict></dict></plist>
+            """))
+        d.append(contentsOf: [0x00, 0xa0, 0x82])
+        return d
+    }
+
+    func testTokenIsHex() {
+        XCTAssertEqual(PushRegistration.tokenString(Data([0x00, 0x0f, 0xab, 0xff])), "000fabff")
+    }
+
+    func testEnvironmentFromTheProfile() {
+        XCTAssertEqual(PushRegistration.environment(provisioningProfile: nil), "production")  // App Store, TestFlight
+        XCTAssertEqual(PushRegistration.environment(provisioningProfile: profile(
+            "<key>aps-environment</key><string>development</string>")), "development")
+        XCTAssertEqual(PushRegistration.environment(provisioningProfile: profile(
+            "<key>aps-environment</key><string>production</string>")), "production")
+        XCTAssertEqual(PushRegistration.environment(provisioningProfile: profile("")), "development")
+        XCTAssertEqual(PushRegistration.environment(provisioningProfile: data("garbage")), "development")
+    }
+
+    func testBody() throws {
+        let body = PushRegistration.body(passcode: "123456", device: "iphone", token: "abcd", environment: "development", topic: "com.anil.jarvis")
+        let json = try JSONSerialization.jsonObject(with: body) as? [String: String]
+        XCTAssertEqual(json, ["passcode": "123456", "device": "iphone", "token": "abcd", "environment": "development", "topic": "com.anil.jarvis"])
+    }
+
+    func testReplies() {
+        XCTAssertNoThrow(try PushRegistration.parse(status: 200, body: data(#"{"ok":true}"#)).get())
+        func refusal(_ status: Int, _ body: String) -> PushRegistration.Refusal? {
+            if case .failure(let r) = PushRegistration.parse(status: status, body: data(body)) { return r }
+            return nil
+        }
+        XCTAssertEqual(refusal(401, #"{"error":"Wrong passcode."}"#), .unauthorized)
+        XCTAssertEqual(refusal(404, "Not Found"), .notSupported)
+        XCTAssertEqual(refusal(409, #"{"error":"Notifications are off on the Mac. Set JARVIS_PUSH=on"}"#),
+                       .off("Notifications are off on the Mac. Set JARVIS_PUSH=on"))
+        XCTAssertEqual(refusal(500, ""), .server("JARVIS didn't take the notification token (HTTP 500)."))
+    }
 }
 
 final class TokenReplyTests: XCTestCase {

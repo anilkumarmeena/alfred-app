@@ -2,10 +2,12 @@ import AVFoundation
 import Capacitor
 import Foundation
 import JarvisAudioCore
+import UserNotifications
 import WebKit
 
 /// The page's handle on VoiceSession, and the server address setting. Method and event names match
-/// src/definitions.ts. Links to jarvis-app://retry and jarvis-app://setup (the bundled error page) are handled
+/// src/definitions.ts. Starting a session also registers for JARVIS's notifications (PushNotifications), and a
+/// tapped notification opens its page here. Links to jarvis-app://retry and jarvis-app://setup (the bundled error page) are handled
 /// here too, and navigation to the saved server is allowed, since its host is only known at run time.
 @objc(JarvisAudioPlugin)
 public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -30,6 +32,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     override public func load() {
         Task { @MainActor in
             VoiceSession.shared.onEvent = { [weak self] name, data in self?.notifyListeners(name, data: data) }
+            PushNotifications.shared.open = { [weak self] url in self?.load(url) }
         }
     }
 
@@ -48,6 +51,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         Task { @MainActor in
             do {
                 call.resolve(try await VoiceSession.shared.start(server: server, passcode: passcode, device: device, muted: muted))
+                PushNotifications.shared.register(server: server, passcode: passcode, device: device)
             } catch let f as VoiceSession.Failure {
                 call.reject(f.message, f.code)
             } catch {
@@ -156,12 +160,23 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     // MARK: - Permissions
 
     @objc override public func checkPermissions(_ call: CAPPluginCall) {
-        call.resolve(["microphone": Self.micState, "notifications": "granted"])
+        Task { call.resolve(["microphone": Self.micState, "notifications": await Self.notificationState()]) }
     }
 
     @objc override public func requestPermissions(_ call: CAPPluginCall) {
-        AVAudioApplication.requestRecordPermission { _ in
-            call.resolve(["microphone": Self.micState, "notifications": "granted"])
+        Task {
+            _ = await AVAudioApplication.requestRecordPermission()
+            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+            call.resolve(["microphone": Self.micState, "notifications": await Self.notificationState()])
+        }
+    }
+
+    /// JARVIS's alerts: heartbeat and background tasks, pushed through APNs.
+    private static func notificationState() async -> String {
+        switch await UNUserNotificationCenter.current().notificationSettings().authorizationStatus {
+        case .authorized, .provisional, .ephemeral: return "granted"
+        case .denied: return "denied"
+        default: return "prompt"
         }
     }
 

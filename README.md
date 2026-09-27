@@ -75,6 +75,12 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
 - Reconnects: LiveKit resumes short drops itself. If the room is lost, the plugin fetches a fresh token and
   rejoins, after 1, 2, 4, 8 and 15 seconds, then every 30, for as long as the session is wanted. It retries
   straight away when `NWPathMonitor` sees the network come back, and stops only for a refused passcode.
+- Notifications (`PushNotifications.swift`): heartbeat alerts and background tasks that finish, fail or have a
+  question come through APNs, so they show with the app closed. When a session starts, the app asks for
+  permission (the first time), gets its APNs device token and posts it to `/api/push/native` with the
+  passcode, the APNs environment (from the build's provisioning profile: `development` for Xcode installs)
+  and the bundle id. Tapping a notification opens its page, e.g. `/?task=3`, on the saved server only. Needs
+  the jarvis side in `server-hook/`, and a paid developer team (a Personal Team can't sign push).
 - Settings → JARVIS (`ios/App/App/Settings.bundle`) has the server address.
 
 ### Android (Kotlin, `packages/jarvis-audio/android`)
@@ -99,13 +105,15 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
 | `packages/jarvis-audio/` | The plugin: `src/definitions.ts` (the TypeScript API), `ios/Sources/JarvisAudioPlugin` (Swift), `ios/JarvisAudioCore` (plain-Swift logic and its tests), `android/src/main/java/com/anil/jarvis/audio` (Kotlin; `core/` is the plain-Kotlin logic, tested in `android/src/test`). |
 | `ios/`, `android/` | The native projects from `npx cap add`, with the changes below. |
 | `web-hook/` | The page's side: `native.ts` and `jarvis-web.patch`, see [web-hook/README.md](web-hook/README.md). |
+| `server-hook/` | The jarvis server's side of app notifications: `jarvis-native-push.patch` (APNs), see [server-hook/README.md](server-hook/README.md). |
 | `tests/` | vitest tests for `web-hook/native.ts`. |
 | `scripts/` | Test and build helpers (below). |
 
 Changes to the generated projects: iOS 17 deployment target; `Info.plist` with the mic usage description,
 `UIBackgroundModes` `audio`, `NSAllowsLocalNetworking` (plain http only for localhost and LAN addresses; the
 real address is HTTPS) and a local network usage description; `MainViewController.swift` (set in
-`Main.storyboard`) and `Settings.bundle`. Android: `minSdk` 26, `compileSdk`/`targetSdk` 35 (Capacitor 7's),
+`Main.storyboard`) and `Settings.bundle`; `App.entitlements` with `aps-environment` (the Push Notifications
+capability) and `AppDelegate.swift` setting up `PushNotifications` and passing on the APNs token. Android: `minSdk` 26, `compileSdk`/`targetSdk` 35 (Capacitor 7's),
 JitPack in the repositories (LiveKit's audioswitch fork), `network_security_config.xml` allowing cleartext
 only for `localhost`, `127.0.0.1` and `10.0.2.2`, the Change server shortcut, and `MainActivity`. The
 plugin's manifest adds `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `FOREGROUND_SERVICE`,
@@ -118,13 +126,15 @@ service.
    [web-hook/README.md](web-hook/README.md), and rebuild the page (`make web-build`). Until then the app
    still works, but as a plain web view: the page opens its own LiveKit session, and the mic stops in the
    background.
-2. **Server: none.** The app uses the existing `/api/token`, the existing passcode and the existing Tailscale
-   Serve setup (`make tailscale-serve`). `logs/web.log` will show the phone as device `iphone` or `android`.
-3. **Notifications (not done):** app web views have no Web Push, so in the app the page hides its
-   notifications pill; keep the Home Screen web app for notifications for now. Native push needs work on both
-   sides: the plugin registering for APNs (a paid Apple Developer account and an APNs key) and FCM (a Firebase
-   project and `google-services.json`), a `/api/push/native` endpoint in `jarvis/web.py` to store device
-   tokens with the passcode, and `jarvis/push.py` sending to APNs and FCM next to Web Push.
+2. **Server, for the voice session: none.** The app uses the existing `/api/token`, the existing passcode and
+   the existing Tailscale Serve setup (`make tailscale-serve`). `logs/web.log` will show the phone as device
+   `iphone` or `android`.
+3. **Server, for notifications (iPhone):** app web views have no Web Push, so the jarvis server's pushes,
+   which were Web Push only, never reached the app. The app now registers with APNs itself and posts its token
+   to `/api/push/native`; the jarvis side of that is `server-hook/jarvis-native-push.patch`, plus an APNs auth
+   key from the Apple Developer account. See [server-hook/README.md](server-hook/README.md). Until it's
+   applied the app's token is refused with a 404 (logged in Xcode's console) and nothing else changes. Android
+   still has no push: that needs FCM (a Firebase project and `google-services.json`) on both sides.
 
 ## Build
 
@@ -165,6 +175,7 @@ cd android
 | `npm run test:ios` | `swift test` for JarvisAudioCore: server addresses, token replies, reconnect timing, earphone debouncing, captions, the chime. `npm run test:ios-direct` does the same with plain `swiftc` + `xctest`. |
 | `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle. `npm run test:android-direct` compiles it with Android Studio's bundled Kotlin compiler instead, without Gradle. |
 | `npm run check:web-patch` | Applies `web-hook/jarvis-web.patch` to a copy of `../jarvis/web`, then typechecks it and runs its tests. |
+| `npm run check:server-patch` | Applies `server-hook/jarvis-native-push.patch` to a copy of the jarvis Python package and tests, then runs them with the jarvis project's environment. |
 
 ## Install on the iPhone
 
@@ -172,7 +183,10 @@ cd android
 2. `npm run ios`. In Xcode, select the **App** target → **Signing & Capabilities**, tick **Automatically
    manage signing**, and pick a **Team**: your paid developer team, or your Apple ID's free **Personal Team**
    (Xcode → Settings → Accounts → + to add the Apple ID). If Xcode says the bundle id `com.anil.jarvis` is
-   taken, change it to something of your own, e.g. `com.anilmeena.jarvis`.
+   taken, change it to something of your own, e.g. `com.anilmeena.jarvis`. The **Push Notifications**
+   capability is listed there (from `App.entitlements`); with a paid team Xcode adds it to the App ID on its
+   own. A Personal Team can't sign it: remove the capability there (the − on it) to build without
+   notifications.
 3. Pick the iPhone as the run destination at the top, and press Run (⌘R).
 4. First time only, on the iPhone:
    - **Developer Mode:** Settings → Privacy & Security → Developer Mode → on. The iPhone restarts; confirm
@@ -181,7 +195,18 @@ cd android
      Device Management → your Apple ID under Developer App → Trust.
    Then press Run again.
 5. Open JARVIS: enter `https://<mac-name>.<tailnet>.ts.net` (Tailscale on, on both), then the passcode on the
-   page as usual, and allow the microphone. Lock the phone and keep talking.
+   page as usual, and allow the microphone, then notifications when iOS asks (once the session is up). Lock
+   the phone and keep talking.
+
+From the terminal instead of Xcode's Run button (the device id is from `xcrun devicectl list devices`, the team
+id from Xcode → Settings → Accounts):
+
+```sh
+cd ~/Desktop/projects/jarvis-app/ios/App
+xcodebuild -project App.xcodeproj -scheme App -configuration Debug -destination 'id=<device id>' \
+  -derivedDataPath ../../.build/DeviceData -allowProvisioningUpdates DEVELOPMENT_TEAM=<team id> build
+xcrun devicectl device install app --device <device id> ../../.build/DeviceData/Build/Products/Debug-iphoneos/App.app
+```
 
 With a **free Personal Team** the app stops opening after 7 days (the profile expires): plug in and press Run
 again to renew it. A paid team's profile lasts a year. Settings → JARVIS changes the address; it applies the

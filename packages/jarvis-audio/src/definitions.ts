@@ -103,12 +103,18 @@ export interface LevelsEvent {
 
 export interface JarvisAudioPermissionStatus {
   microphone: PermissionState;
-  /** Android 13+: the ongoing-session notification. Always granted on iOS, which doesn't need one. */
+  /**
+   * Android 13+: the ongoing-session notification. iOS: JARVIS's alerts (heartbeat, background tasks), which
+   * the app registers for through APNs when a session starts, asking the first time.
+   */
   notifications: PermissionState;
 }
 
 export interface JarvisAudioPlugin {
-  /** Connects to JARVIS and starts the mic. Resolves once connected; rejects with code UNAUTHORIZED, RATE_LIMITED, NO_MICROPHONE or SERVER. */
+  /**
+   * Connects to JARVIS and starts the mic. Resolves once connected; rejects with code UNAUTHORIZED, RATE_LIMITED,
+   * NO_MICROPHONE or SERVER. On iOS it then registers the app for JARVIS's notifications (/api/push/native).
+   */
   start(options: StartOptions): Promise<SessionStatus>;
   /** Ends the session and stops the mic. */
   stop(): Promise<void>;

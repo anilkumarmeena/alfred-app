@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Push Notifications: JARVIS's heartbeat alerts and background-task updates, through APNs.
+	     Xcode signs builds for the phone with "development" (APNs's sandbox server); an App Store or TestFlight
+	     export switches it to "production". The app tells jarvis.web which one it has. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>
