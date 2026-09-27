@@ -65,9 +65,15 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   always prepared" mode keeps the engine running between rooms too, so a reconnect in the background isn't
   suspended while it waits.
 - Earphone button (`RemoteControls.swift`): on AirPods, iOS 17's mute gesture mutes the app's input itself and
-  reports it with `AVAudioApplication.inputMuteStateChangeNotification`. The plugin follows it, and clears
-  `AVAudioApplication.setInputMuted` when unmuting from the screen; it never sets it, since iOS answers that
-  with its own tone and a notification that undid the mute. Wired and other headsets send
+  reports it with `AVAudioApplication.inputMuteStateChangeNotification`. Adding an observer for that notification
+  is what opts the app into Press to Mute: iOS marks each audio session the app has at that moment
+  (`PrefersBluetoothAccessoryMuting`), and a stem press is only accepted on a marked session that's recording. A
+  session created later starts unmarked, and the press gets "Cannot control mic with AirPods". So the observer is
+  added when the plugin loads and added again (`RemoteControls.optIn`) once the mic is on, or the room is joined
+  muted; with no session it's ignored. The plugin follows iOS's state, and tells iOS about every mute from the screen too with
+  `AVAudioApplication.setInputMuted`, dropping the notification that echoes it back. Each notification is logged
+  (subsystem `com.anil.jarvis`, category `mute`) with its value, iOS's mute state and the input route
+  (`BluetoothHFP` for AirPods, `MicrophoneBuiltIn` for the phone). Wired and other headsets send
   `MPRemoteCommandCenter` play, pause and toggle commands, which toggle the mute and play the page's
   falling or rising chime. The lock screen's Now Playing card shows Listening, Muted, Speaking and so on.
 - Interruptions: a call or Siri pauses the mic ("Mic paused"), and when it ends the session is reactivated.
