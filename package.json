@@ -1,0 +1,33 @@
+{
+  "name": "jarvis-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "JARVIS for iPhone and Android: a Capacitor shell around the live JARVIS web page, with native background audio.",
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix packages/jarvis-audio run build",
+    "sync": "npm run build && cap sync",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm --prefix packages/jarvis-audio run typecheck",
+    "test": "vitest run",
+    "test:ios": "sh scripts/swift-test.sh",
+    "test:ios-direct": "sh scripts/swift-test-direct.sh",
+    "test:android": "cd android && ./gradlew :jarvis-audio:testDebugUnitTest",
+    "test:android-direct": "sh scripts/kotlin-test-direct.sh",
+    "build:ios-sim": "sh scripts/build-ios-sim.sh",
+    "build:android": "cd android && ./gradlew assembleDebug",
+    "check:web-patch": "sh scripts/check-web-patch.sh",
+    "ios": "cap open ios",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/core": "^7.6.9",
+    "@capacitor/ios": "^7.6.9",
+    "jarvis-audio": "file:packages/jarvis-audio"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.9",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>JARVIS</title>
+<link rel="stylesheet" href="shell.css">
+</head>
+<body>
+<!-- Capacitor shows this (server.errorPath) when the page on the Mac doesn't load. The links are handled by the
+     JarvisAudio plugin natively, so they work on Android too, where this page gets no Capacitor bridge. -->
+<div class="card">
+  <h1>Can't reach JARVIS</h1>
+  <p>Check that Tailscale is on, on this phone and on the Mac, and that the Mac is awake.</p>
+  <a class="button" href="jarvis-app://retry">Try again</a>
+  <a class="link" href="jarvis-app://setup">Change server</a>
+</div>
+</body>
+</html>
