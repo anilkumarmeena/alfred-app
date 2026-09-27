@@ -18,3 +18,12 @@ coverage/
 
 # Local build output: DerivedData, SwiftPM checkouts, test bundles, scratch copies
 .build/
+
+# Android and Xcode local files
+.gradle/
+local.properties
+*.apk
+*.aab
+.idea/
+*.iml
+xcuserdata/
