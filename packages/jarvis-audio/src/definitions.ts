@@ -53,6 +53,21 @@ export interface SessionStatus {
   startedAt?: number;
   /** The audio route in use, e.g. "AirPods Pro" or "Speaker". */
   route?: string;
+  /** iOS only: the Mic Mode in use and the one the user picked. */
+  micMode?: MicModeEvent;
+}
+
+/**
+ * iOS's Mic Mode for the app. `preferred` is what the user picked in Control Center; `active` is what's
+ * processing the mic now, which differs when the route can't do the preferred one. Apps can't set it: the
+ * plugin opens Apple's picker once per launch when a session's mic goes live without Voice Isolation, and
+ * shows a Mic button during a session.
+ */
+export type MicMode = "standard" | "voiceIsolation" | "wideSpectrum" | "other";
+
+export interface MicModeEvent {
+  active: MicMode;
+  preferred: MicMode;
 }
 
 export interface ConnectionEvent {
@@ -123,6 +138,10 @@ export interface JarvisAudioPlugin {
   /** Sends a typed message on lk.chat. Before the agent is listening it is queued, like the page does. */
   sendText(options: { text: string }): Promise<void>;
   getStatus(): Promise<SessionStatus>;
+  /** iOS only: the current Mic Mode. */
+  getMicMode(): Promise<MicModeEvent>;
+  /** iOS only: opens Apple's Mic Mode picker (Standard, Voice Isolation, Wide Spectrum). */
+  showMicModes(): Promise<void>;
 
   /** The saved server URL, and whether it's the build-time default. */
   getServerUrl(): Promise<{ url: string | null; fromBuild: boolean }>;
@@ -142,5 +161,7 @@ export interface JarvisAudioPlugin {
   addListener(event: "route", fn: (e: RouteEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: "quality", fn: (e: QualityEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: "levels", fn: (e: LevelsEvent) => void): Promise<PluginListenerHandle>;
+  /** iOS only: the Mic Mode changed (picked in Control Center, or the route changed). */
+  addListener(event: "micMode", fn: (e: MicModeEvent) => void): Promise<PluginListenerHandle>;
   removeAllListeners(): Promise<void>;
 }

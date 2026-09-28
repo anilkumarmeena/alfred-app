@@ -76,6 +76,18 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   (`BluetoothHFP` for AirPods, `MicrophoneBuiltIn` for the phone). Wired and other headsets send
   `MPRemoteCommandCenter` play, pause and toggle commands, which toggle the mute and play the page's
   falling or rising chime. The lock screen's Now Playing card shows Listening, Muted, Speaking and so on.
+- Voice Isolation (`MicMode.swift`): iOS's Mic Modes (Standard, Voice Isolation, Wide Spectrum) run inside
+  Apple's voice processing, which the `.voiceChat` session and LiveKit's engine already use, so Control Center
+  offers Mic Mode for JARVIS while the mic is on. Apps can't set the mode (even in the iOS 27 SDK,
+  `AVCaptureDevice.preferredMicrophoneMode` and `activeMicrophoneMode` are read-only), so the app does the
+  next best thing: the first time in each launch that a session's mic goes live and Voice Isolation isn't the
+  chosen mode, it opens Apple's picker itself (`AVCaptureDevice.showSystemUserInterface(.microphoneModes)`),
+  about 1.5 seconds after the mic starts and only with the app on screen. Once Voice Isolation is picked, iOS
+  remembers it for the app and the picker stays shut. During a session a small **Mic: …** pill under the
+  page's header, on the left, shows the mode in use (green dot for Voice Isolation) and opens the picker when
+  tapped. Both properties are watched with KVO; the page gets `micMode` events, `getMicMode()` and
+  `showMicModes()`. Each change and the voice-processing state at mic start are logged (subsystem
+  `com.anil.jarvis`, category `micmode`).
 - Interruptions: a call or Siri pauses the mic ("Mic paused"), and when it ends the session is reactivated.
   Route changes (AirPods in or out) go to the page as `route` events. A media services reset rejoins.
 - Reconnects: LiveKit resumes short drops itself. If the room is lost, the plugin fetches a fresh token and

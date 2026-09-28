@@ -51,6 +51,7 @@ final class VoiceSession: NSObject {
     private let routing = AudioRouting()
     private let controls = RemoteControls()
     private let chime = ChimePlayer()
+    let micMode = MicMode()
 
     private(set) var connection = "disconnected"
     private(set) var agentState: String?
@@ -69,6 +70,7 @@ final class VoiceSession: NSObject {
         try? AudioManager.shared.set(microphoneMuteMode: .inputMixer)
         routing.onEvent = { [weak self] in self?.audioEvent($0) }
         controls.onPress = { [weak self] in self?.press($0) }
+        micMode.onChange = { [weak self] in self?.emit("micMode", $0.state) }
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(appActive), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
@@ -78,6 +80,7 @@ final class VoiceSession: NSObject {
         if let agentState { s["agent"] = agentState }
         if let startedAt { s["startedAt"] = Int(startedAt.timeIntervalSince1970 * 1000) }
         if wanted != nil { s["route"] = routing.route.output }
+        s["micMode"] = micMode.state
         return s
     }
 
@@ -101,6 +104,7 @@ final class VoiceSession: NSObject {
         generation += 1
         let gen = generation
         muted = startMuted
+        micMode.sessionStarted()
         // With iOS's mute matching ours before the engine opens the mic. (micOn opts the recording session in to
         // the AirPods gesture.)
         controls.enable()
@@ -132,6 +136,7 @@ final class VoiceSession: NSObject {
         connection = "disconnected"; agentState = nil; muted = false; interrupted = false; startedAt = nil
         attempt = 0; outbox.removeAll(); presses.reset()
         controls.disable()
+        micMode.sessionEnded()
         Task {
             guard self.wanted == nil else { return }  // a new session started meanwhile
             try? await AudioManager.shared.setRecordingAlwaysPreparedMode(false)
@@ -212,7 +217,10 @@ final class VoiceSession: NSObject {
     private func micOn(_ r: Room, _ on: Bool) async -> Bool {
         do {
             try await r.localParticipant.setMicrophone(enabled: on)
-            if on { controls.optIn() }  // now that it's recording, so the AirPods stem can mute this session
+            if on {
+                controls.optIn()  // now that it's recording, so the AirPods stem can mute this session
+                micMode.micLive()  // and Control Center offers Mic Mode: open it if Voice Isolation isn't chosen
+            }
             return true
         } catch {
             NSLog("JarvisAudio: mic \(on): \(error)")
@@ -393,6 +401,7 @@ final class VoiceSession: NSObject {
         switch e {
         case .interruptionBegan:
             interrupted = true
+            micMode.micStopped()
             emit("interruption", ["state": "began"])
             showNowPlaying()
         case .interruptionEnded:

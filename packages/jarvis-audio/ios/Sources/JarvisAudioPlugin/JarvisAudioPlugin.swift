@@ -20,6 +20,8 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "toggleMute", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendText", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getStatus", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getMicMode", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "showMicModes", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getServerUrl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setServerUrl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "clearServerUrl", returnType: CAPPluginReturnPromise),
@@ -33,6 +35,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         Task { @MainActor in
             VoiceSession.shared.onEvent = { [weak self] name, data in self?.notifyListeners(name, data: data) }
             PushNotifications.shared.open = { [weak self] url in self?.load(url) }
+            if let view = self.bridge?.viewController?.view { VoiceSession.shared.micMode.attach(to: view) }
         }
     }
 
@@ -101,6 +104,20 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func getStatus(_ call: CAPPluginCall) {
         Task { @MainActor in call.resolve(VoiceSession.shared.status()) }
+    }
+
+    // MARK: - Mic Mode (Voice Isolation)
+
+    @objc func getMicMode(_ call: CAPPluginCall) {
+        Task { @MainActor in call.resolve(VoiceSession.shared.micMode.state) }
+    }
+
+    /// Opens iOS's Mic Mode picker. Apps can't set the mode themselves; the user picks it there.
+    @objc func showMicModes(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            VoiceSession.shared.micMode.show()
+            call.resolve()
+        }
     }
 
     // MARK: - The server address
