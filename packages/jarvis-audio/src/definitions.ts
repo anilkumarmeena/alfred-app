@@ -60,8 +60,8 @@ export interface SessionStatus {
 /**
  * iOS's Mic Mode for the app. `preferred` is what the user picked in Control Center; `active` is what's
  * processing the mic now, which differs when the route can't do the preferred one. Apps can't set it: the
- * plugin opens Apple's picker once per launch when a session's mic goes live without Voice Isolation, and
- * shows a Mic button during a session.
+ * plugin opens Apple's picker once per launch when a session's mic goes live without Voice Isolation. The page
+ * draws its own Mic pill from these and opens the picker with `showMicModes()`.
  */
 export type MicMode = "standard" | "voiceIsolation" | "wideSpectrum" | "other";
 

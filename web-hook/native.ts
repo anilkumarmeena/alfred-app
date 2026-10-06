@@ -9,13 +9,17 @@
 type Handle = { remove(): Promise<void> | void };
 type Listener = (e: any) => void;
 
+/** iOS's Mic Mode: `active` is processing the mic now, `preferred` is what the user picked in Control Center. */
+export interface MicMode { active: string; preferred: string }
+
 /** The part of the JarvisAudio plugin the page uses (the full API is in jarvis-app's packages/jarvis-audio). */
 export interface NativeAudio {
   start(o: { serverUrl?: string; passcode: string; device?: string; muted?: boolean }): Promise<unknown>;
   stop(): Promise<void>;
   setMuted(o: { muted: boolean }): Promise<{ muted: boolean }>;
   sendText(o: { text: string }): Promise<void>;
-  getStatus(): Promise<{ connection: string; agent?: string; muted: boolean; interrupted: boolean; startedAt?: number }>;
+  getStatus(): Promise<{ connection: string; agent?: string; muted: boolean; interrupted: boolean; startedAt?: number; micMode?: MicMode }>;
+  showMicModes?(): Promise<void>;  // iOS only: Apple's Mic Mode picker
   addListener(event: string, fn: Listener): Promise<Handle> | Handle;
 }
 
@@ -38,6 +42,7 @@ export interface NativePage {
   line(id: string, who: "you" | "jarvis", text: string): void;  // a caption: replace the line with this id
   ended(message?: string): void;  // back to no session, saying why if it wasn't the user
   unauthorized(message: string): void;  // the passcode was refused: ask again
+  setMicMode?(m: MicMode | null): void;  // iOS: the Mic Mode in use during a session, null without one
 }
 
 export interface NativeSession {
@@ -53,12 +58,15 @@ export interface NativeSession {
   levels(): { mic: number; agent: number };
   /** Picks up a session the plugin is already running, e.g. after the page reloaded. */
   adopt(): Promise<void>;
+  /** iOS: opens Apple's Mic Mode picker. */
+  showMicModes(): void;
 }
 
 export function bindNative(plugin: NativeAudio, page: NativePage, origin = globalThis.location?.origin): NativeSession {
   let muted = false, live = false, agentKnown = false, last = "disconnected";
   const connected = () => last !== "disconnected";
   const levels = { mic: 0, agent: 0 };
+  const micMode = (m?: MicMode) => { if (m?.active) page.setMicMode?.({ active: m.active, preferred: m.preferred || m.active }); };
 
   // state is "connecting", "reconnecting" or "connected"
   function up(state: string, startedAt?: number) {
@@ -75,6 +83,7 @@ export function bindNative(plugin: NativeAudio, page: NativePage, origin = globa
     const was = connected();
     live = false; muted = false; agentKnown = false; last = "disconnected";
     levels.mic = levels.agent = 0;
+    page.setMicMode?.(null);
     if (reason === "unauthorized") return page.unauthorized(message || "Wrong passcode.");
     if (was || message) page.ended(reason === "hangup" ? undefined : message || "Connection lost. Tap the core to reconnect.");
   }
@@ -87,6 +96,7 @@ export function bindNative(plugin: NativeAudio, page: NativePage, origin = globa
   on("interruption", (e) => page.setPaused(e.state === "began" ? "recovering" : ""));
   on("quality", (e) => page.setQuality(e.quality));
   on("levels", (e) => { levels.mic = +e.mic || 0; levels.agent = +e.agent || 0; });
+  on("micMode", (e) => { if (connected()) micMode(e); });
 
   async function connect({ passcode, muted: startMuted = false }: { passcode: string; muted?: boolean }) {
     if (connected()) return;
@@ -94,6 +104,7 @@ export function bindNative(plugin: NativeAudio, page: NativePage, origin = globa
     muted = startMuted; page.setMuted(startMuted);
     try {
       const s: any = await plugin.start({ serverUrl: origin, passcode, muted: startMuted });
+      micMode(s?.micMode);
       up(s?.connection || "connected", s?.startedAt);
     } catch (e: any) {
       const code = e?.code, message = e?.message || String(e);
@@ -115,11 +126,13 @@ export function bindNative(plugin: NativeAudio, page: NativePage, origin = globa
       if (connected()) await plugin.sendText({ text });
     },
     levels: () => levels,
+    showMicModes() { plugin.showMicModes?.().catch(() => {}); },
     async adopt() {
       const s = await plugin.getStatus().catch(() => null);
       if (!s || s.connection === "disconnected") return;
       agentKnown = !!s.agent;
       muted = s.muted; page.setMuted(s.muted);
+      micMode(s.micMode);
       up(s.connection, s.startedAt);
       if (s.agent && s.connection === "connected") page.setState(s.agent);
       if (s.interrupted) page.setPaused("recovering");

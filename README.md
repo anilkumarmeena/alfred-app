@@ -83,10 +83,9 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   next best thing: the first time in each launch that a session's mic goes live and Voice Isolation isn't the
   chosen mode, it opens Apple's picker itself (`AVCaptureDevice.showSystemUserInterface(.microphoneModes)`),
   about 1.5 seconds after the mic starts and only with the app on screen. Once Voice Isolation is picked, iOS
-  remembers it for the app and the picker stays shut. During a session a small **Mic: …** pill under the
-  page's header, on the left, shows the mode in use (green dot for Voice Isolation) and opens the picker when
-  tapped. Both properties are watched with KVO; the page gets `micMode` events, `getMicMode()` and
-  `showMicModes()`. Each change and the voice-processing state at mic start are logged (subsystem
+  remembers it for the app and the picker stays shut. Both properties are watched with KVO; the page gets
+  `micMode` events, the mode in `getStatus()`, `getMicMode()` and `showMicModes()`, and draws its own
+  **Mic: …** pill from them during a session (the app draws no UI over the page). Each change and the voice-processing state at mic start are logged (subsystem
   `com.anil.jarvis`, category `micmode`).
 - Interruptions: a call or Siri pauses the mic ("Mic paused"), and when it ends the session is reactivated.
   Route changes (AirPods in or out) go to the page as `route` events. A media services reset rejoins.

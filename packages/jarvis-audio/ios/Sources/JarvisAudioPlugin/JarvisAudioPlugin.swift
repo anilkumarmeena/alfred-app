@@ -35,7 +35,6 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         Task { @MainActor in
             VoiceSession.shared.onEvent = { [weak self] name, data in self?.notifyListeners(name, data: data) }
             PushNotifications.shared.open = { [weak self] url in self?.load(url) }
-            if let view = self.bridge?.viewController?.view { VoiceSession.shared.micMode.attach(to: view) }
         }
     }
 
