@@ -49,6 +49,9 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>JARVIS listens through the microphone while a session is on, including with the screen locked. Press your earphone button or tap the core to mute it.</string>
+	<!-- The session's Live Activity (SessionActivity, drawn by the JarvisWidget extension). -->
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

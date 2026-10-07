@@ -156,24 +156,6 @@ final class ReconnectPolicyTests: XCTestCase {
     }
 }
 
-final class EarphoneDebouncerTests: XCTestCase {
-    func testOnePressCountsOnce() {
-        var d = EarphoneDebouncer(window: 0.4)
-        XCTAssertTrue(d.accept(at: 10))
-        XCTAssertFalse(d.accept(at: 10.1))  // the same press, as a second command
-        XCTAssertFalse(d.accept(at: 10.39))
-        XCTAssertTrue(d.accept(at: 10.5))
-        d.reset()
-        XCTAssertTrue(d.accept(at: 10.6))
-    }
-
-    func testClockGoingBackIsANewPress() {
-        var d = EarphoneDebouncer()
-        XCTAssertTrue(d.accept(at: 100))
-        XCTAssertTrue(d.accept(at: 5))
-    }
-}
-
 final class ChimeTests: XCTestCase {
     func testFallsForMutedRisesForListening() {
         XCTAssertEqual(Chime.frequencies(muted: true), [880, 587])
@@ -252,12 +234,5 @@ final class SessionSummaryTests: XCTestCase {
         XCTAssertEqual(summary(muted: true, interrupted: true)?.status, "Mic paused for a call")
         XCTAssertEqual(summary("connecting", muted: true)?.status, "Connecting…")
         XCTAssertEqual(summary("reconnecting")?.phase, .reconnecting)
-    }
-
-    func testPlayingFollowsTheMuteOnly() {
-        XCTAssertEqual(summary()?.playing, true)
-        XCTAssertEqual(summary("reconnecting")?.playing, true)
-        XCTAssertEqual(summary(interrupted: true)?.playing, true)
-        XCTAssertEqual(summary(muted: true)?.playing, false)
     }
 }

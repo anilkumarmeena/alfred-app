@@ -10,6 +10,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // JARVIS's notifications: set up before launch finishes, so a tap that opened the app reaches the page.
         PushNotifications.shared.install()
+        // The lock screen and Dynamic Island card during a session, with Mute and Hang Up buttons.
+        SessionActivity.shared.install()
         return true
     }
 

@@ -17,7 +17,38 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		7A11C0DE0000000000000002 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000001 /* MainViewController.swift */; };
 		7A11C0DE0000000000000004 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000003 /* Settings.bundle */; };
+		7A11C0DE0000000000000007 /* JarvisActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000006 /* JarvisActivity.swift */; };
+		7A11C0DE0000000000000008 /* JarvisActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000006 /* JarvisActivity.swift */; };
+		7A11C0DE000000000000000A /* SessionActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000009 /* SessionActivity.swift */; };
+		7A11C0DE000000000000000C /* JarvisWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000000000000000B /* JarvisWidgetBundle.swift */; };
+		7A11C0DE000000000000000E /* JarvisLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000000000000000D /* JarvisLiveActivity.swift */; };
+		7A11C0DE0000000000000011 /* JarvisWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000010 /* JarvisWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7A11C0DE0000000000000020 /* JarvisAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A11C0DE000000000000001F /* JarvisAudioCore */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		7A11C0DE0000000000000019 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7A11C0DE0000000000000014;
+			remoteInfo = JarvisWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7A11C0DE0000000000000018 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7A11C0DE0000000000000011 /* JarvisWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
@@ -33,6 +64,12 @@
 		7A11C0DE0000000000000001 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		7A11C0DE0000000000000003 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
 		7A11C0DE0000000000000005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		7A11C0DE0000000000000006 /* JarvisActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarvisActivity.swift; sourceTree = "<group>"; };
+		7A11C0DE0000000000000009 /* SessionActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActivity.swift; sourceTree = "<group>"; };
+		7A11C0DE000000000000000B /* JarvisWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarvisWidgetBundle.swift; sourceTree = "<group>"; };
+		7A11C0DE000000000000000D /* JarvisLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarvisLiveActivity.swift; sourceTree = "<group>"; };
+		7A11C0DE000000000000000F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7A11C0DE0000000000000010 /* JarvisWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JarvisWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,6 +81,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A11C0DE0000000000000016 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A11C0DE0000000000000020 /* JarvisAudioCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -52,6 +97,8 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				7A11C0DE0000000000000012 /* Shared */,
+				7A11C0DE0000000000000013 /* JarvisWidget */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -60,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				7A11C0DE0000000000000010 /* JarvisWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +118,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				7A11C0DE0000000000000001 /* MainViewController.swift */,
+				7A11C0DE0000000000000009 /* SessionActivity.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				7A11C0DE0000000000000003 /* Settings.bundle */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
@@ -82,6 +131,24 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		7A11C0DE0000000000000012 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				7A11C0DE0000000000000006 /* JarvisActivity.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		7A11C0DE0000000000000013 /* JarvisWidget */ = {
+			isa = PBXGroup;
+			children = (
+				7A11C0DE000000000000000B /* JarvisWidgetBundle.swift */,
+				7A11C0DE000000000000000D /* JarvisLiveActivity.swift */,
+				7A11C0DE000000000000000F /* Info.plist */,
+			);
+			path = JarvisWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -92,10 +159,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				7A11C0DE0000000000000018 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				7A11C0DE000000000000001A /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -104,6 +173,26 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		7A11C0DE0000000000000014 /* JarvisWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A11C0DE000000000000001B /* Build configuration list for PBXNativeTarget "JarvisWidget" */;
+			buildPhases = (
+				7A11C0DE0000000000000015 /* Sources */,
+				7A11C0DE0000000000000016 /* Frameworks */,
+				7A11C0DE0000000000000017 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = JarvisWidget;
+			packageProductDependencies = (
+				7A11C0DE000000000000001F /* JarvisAudioCore */,
+			);
+			productName = JarvisWidget;
+			productReference = 7A11C0DE0000000000000010 /* JarvisWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -119,6 +208,10 @@
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
 					};
+					7A11C0DE0000000000000014 = {
+						CreatedOnToolsVersion = 27.0;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
@@ -132,12 +225,14 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
+				7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/jarvis-audio/ios/JarvisAudioCore" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				7A11C0DE0000000000000014 /* JarvisWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -157,6 +252,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7A11C0DE0000000000000017 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -166,10 +268,30 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				7A11C0DE0000000000000002 /* MainViewController.swift in Sources */,
+				7A11C0DE000000000000000A /* SessionActivity.swift in Sources */,
+				7A11C0DE0000000000000007 /* JarvisActivity.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7A11C0DE0000000000000015 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7A11C0DE000000000000000C /* JarvisWidgetBundle.swift in Sources */,
+				7A11C0DE000000000000000E /* JarvisLiveActivity.swift in Sources */,
+				7A11C0DE0000000000000008 /* JarvisActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7A11C0DE000000000000001A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7A11C0DE0000000000000014 /* JarvisWidget */;
+			targetProxy = 7A11C0DE0000000000000019 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -346,6 +468,49 @@
 			};
 			name = Release;
 		};
+		7A11C0DE000000000000001C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = JarvisWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.anil.jarvis.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7A11C0DE000000000000001D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = JarvisWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.anil.jarvis.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -367,12 +532,25 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		7A11C0DE000000000000001B /* Build configuration list for PBXNativeTarget "JarvisWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A11C0DE000000000000001C /* Debug */,
+				7A11C0DE000000000000001D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
 		D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "CapApp-SPM";
+		};
+		7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/jarvis-audio/ios/JarvisAudioCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../packages/jarvis-audio/ios/JarvisAudioCore;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -381,6 +559,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
+		};
+		7A11C0DE000000000000001F /* JarvisAudioCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/jarvis-audio/ios/JarvisAudioCore" */;
+			productName = JarvisAudioCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

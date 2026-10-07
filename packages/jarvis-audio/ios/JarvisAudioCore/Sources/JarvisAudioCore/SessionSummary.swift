@@ -1,10 +1,10 @@
 import Foundation
 
-/// What the session is doing, in a word for the user: the lock screen's Now Playing card shows it under
-/// "JARVIS", and a Live Activity can show the same thing. Built from VoiceSession's state, so every surface
-/// outside the page says the same.
-public struct SessionSummary: Equatable, Sendable {
-    public enum Phase: String, Sendable {
+/// What the session is doing, in a word for the user: the Live Activity on the lock screen, in the Dynamic
+/// Island and on the watch shows it under "JARVIS". Built from VoiceSession's state, so every surface outside
+/// the page says the same.
+public struct SessionSummary: Codable, Hashable, Sendable {  // Codable: the Live Activity's content carries it
+    public enum Phase: String, Codable, Sendable {
         case connecting, reconnecting, interrupted, muted, speaking, thinking, listening
     }
 
@@ -39,9 +39,4 @@ public struct SessionSummary: Equatable, Sendable {
         case .listening: return "Listening"
         }
     }
-
-    /// Whether the mic is meant to be heard: Now Playing shows it as playing (a pause button, which mutes) or
-    /// paused (a play button, which unmutes). It follows the user's mute only, so the button always does what
-    /// it shows, even while connecting or in a call.
-    public var playing: Bool { !muted }
 }

@@ -109,7 +109,7 @@ final class MicMode: NSObject {
         let a = AVCaptureDevice.activeMicrophoneMode, p = AVCaptureDevice.preferredMicrophoneMode
         guard a != active || p != preferred else { return }
         active = a; preferred = p
-        micModeLog.info("mode active=\(Self.name(a), privacy: .public) preferred=\(Self.name(p), privacy: .public) input=\(RemoteControls.inputRoute, privacy: .public)")
+        micModeLog.info("mode active=\(Self.name(a), privacy: .public) preferred=\(Self.name(p), privacy: .public) input=\(AirPodsMute.inputRoute, privacy: .public)")
         onChange?(self)
     }
 

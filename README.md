@@ -7,8 +7,10 @@ in a native plugin, JarvisAudio, and not in the web view, so:
 - the mic keeps listening with the screen locked or another app in front (a mobile browser or plain web view
   stops it),
 - JARVIS's voice keeps playing in the background,
-- the earphone button mutes and unmutes: the AirPods stem press on iOS 17+, the wired EarPods button, a
-  Bluetooth headset's play/pause, and the lock-screen or notification controls,
+- the earphone button mutes and unmutes: the AirPods stem press on iOS 17+; on Android also a wired or
+  Bluetooth headset's play/pause, and the notification's controls,
+- on iPhone, a Live Activity on the lock screen, in the Dynamic Island and on Apple Watch shows what JARVIS is
+  doing, with Mute/Unmute and Hang Up buttons,
 - phone calls, Siri, AirPods going in and out, and network drops are handled: the session comes back on its own.
 
 ## How it works
@@ -64,25 +66,29 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   `inputMixer` mode, so the engine keeps running (no iOS mute sound, and the app isn't suspended). "Recording
   always prepared" mode keeps the engine running between rooms too, so a reconnect in the background isn't
   suspended while it waits.
-- Earphone button (`RemoteControls.swift`): on AirPods, iOS 17's mute gesture mutes the app's input itself and
+- AirPods stem press (`AirPodsMute.swift`): on AirPods, iOS 17's mute gesture mutes the app's input itself and
   reports it with `AVAudioApplication.inputMuteStateChangeNotification`. Adding an observer for that notification
   is what opts the app into Press to Mute: iOS marks each audio session the app has at that moment
   (`PrefersBluetoothAccessoryMuting`), and a stem press is only accepted on a marked session that's recording. A
   session created later starts unmarked, and the press gets "Cannot control mic with AirPods". So the observer is
-  added when the plugin loads and added again (`RemoteControls.optIn`) once the mic is on, or the room is joined
+  added when the plugin loads and added again (`AirPodsMute.optIn`) once the mic is on, or the room is joined
   muted; with no session it's ignored. The plugin follows iOS's state, and tells iOS about every mute from the screen too with
   `AVAudioApplication.setInputMuted`, dropping the notification that echoes it back. Each notification is logged
   (subsystem `com.anil.jarvis`, category `mute`) with its value, iOS's mute state and the input route
-  (`BluetoothHFP` for AirPods, `MicrophoneBuiltIn` for the phone). Wired and other headsets send
-  `MPRemoteCommandCenter` play, pause and toggle commands, which toggle the mute and play the page's
-  falling or rising chime. Every other media command (next/previous track, skip, seek, scrubbing, rate) is
-  switched off, so the lock screen shows no buttons that would do nothing.
-- Lock screen (`NowPlaying.swift`): during a session the Now Playing card shows **JARVIS**, what it's doing
+  (`BluetoothHFP` for AirPods, `MicrophoneBuiltIn` for the phone).
+- No Now Playing: the app takes no `MPRemoteCommandCenter` commands, so iOS shows no media card for it (that
+  card always keeps dimmed ⏮ ⏭ slots an app can't remove, and doubled up with the Live Activity). The cost: the
+  play/pause button of wired EarPods and other Bluetooth headsets goes to the last media app, not JARVIS.
+- Live Activity (`ios/App/App/SessionActivity.swift`, drawn by the `JarvisWidget` extension): during a session
+  the lock screen, the Dynamic Island and the Apple Watch Smart Stack show **JARVIS**, what it's doing
   (Listening, Muted, Speaking, Thinking, Connecting…, Mic paused for a call; `SessionSummary` in the core), the
-  app icon as artwork (the `NowPlayingArtwork` image in the app's asset catalog, a copy of the icon) and LIVE.
-  Its button is pause while the mic is heard and play while muted, and either one toggles the mute. The
-  AirPlay/route button is iOS's own. The card is cleared when the session ends. `VoiceSession.summaryChanged`
-  is the one place it's updated from, ready for a Live Activity to follow the same summary.
+  session's running time, and **Mute/Unmute** and **Hang Up** buttons; tapping elsewhere opens the app. The
+  watch gets its own small layout (`supplementalActivityFamilies`, so the extension needs iOS 18), and a button
+  tapped there runs on the iPhone. Mute plays the same falling or rising chime as the page. The plugin hands
+  the app the summary through `SessionControls` (it can't own the Activity itself, as ActivityKit's types must be
+  compiled into the extension too). `ios/App/Shared/JarvisActivity.swift`, in both targets, has the activity's
+  data and the buttons' `LiveActivityIntent`s, which run in the app's process. Mute asks for a state (`SetMutedIntent(muted:)`), not a toggle: a tap on the watch reaches the iPhone twice, and a toggle would undo itself. It ends with the session; one
+  swiped away stays away until the next session. Logged under category `liveactivity`.
 - Voice Isolation (`MicMode.swift`): iOS's Mic Modes (Standard, Voice Isolation, Wide Spectrum) run inside
   Apple's voice processing, which the `.voiceChat` session and LiveKit's engine already use, so Control Center
   offers Mic Mode for JARVIS while the mic is on. Apps can't set the mode (even in the iOS 27 SDK,
@@ -196,7 +202,7 @@ cd android
 |---|---|
 | `npm test` | vitest: the page hook (`web-hook/native.ts`) against a fake plugin. |
 | `npm run typecheck` | TypeScript for the config, the shell page, the hook and the plugin API. |
-| `npm run test:ios` | `swift test` for JarvisAudioCore: server addresses, token replies, reconnect timing, earphone debouncing, captions, the chime, the lock screen's status line. `npm run test:ios-direct` does the same with plain `swiftc` + `xctest`. |
+| `npm run test:ios` | `swift test` for JarvisAudioCore: server addresses, token replies, reconnect timing, captions, the chime, the Live Activity's status line. `npm run test:ios-direct` does the same with plain `swiftc` + `xctest`. |
 | `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle. `npm run test:android-direct` compiles it with Android Studio's bundled Kotlin compiler instead, without Gradle. |
 | `npm run check:web-patch` | Applies `web-hook/jarvis-web.patch` to a copy of `../jarvis/web`, then typechecks it and runs its tests. |
 | `npm run check:server-patch` | Applies `server-hook/jarvis-native-push.patch` to a copy of the jarvis Python package and tests, then runs them with the jarvis project's environment. |
