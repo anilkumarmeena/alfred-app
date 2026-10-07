@@ -34,6 +34,18 @@ final class SessionActivity {
         }
     }
 
+    /// The app is being quit (swiped away in the app switcher; a session keeps it running in the background, so
+    /// iOS says so first). iOS leaves a quit app's Live Activities up, so end the card before the process goes,
+    /// waiting up to two seconds. A crash or a kill without warning leaves it until the next launch.
+    static nonisolated func endBeforeQuit() {
+        let done = DispatchSemaphore(value: 0)
+        Task.detached {
+            for a in Activity<JarvisActivityAttributes>.activities { await a.end(nil, dismissalPolicy: .immediate) }
+            done.signal()
+        }
+        if done.wait(timeout: .now() + 2) == .timedOut { log.error("quit: the Live Activity didn't end in time") }
+    }
+
     private func show(_ summary: SessionSummary?, startedAt: Date?) {
         guard let summary else { return end() }
         let content = ActivityContent(state: JarvisActivityAttributes.ContentState(summary: summary, startedAt: startedAt), staleDate: nil)

@@ -87,8 +87,9 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   tapped there runs on the iPhone. Mute plays the same falling or rising chime as the page. The plugin hands
   the app the summary through `SessionControls` (it can't own the Activity itself, as ActivityKit's types must be
   compiled into the extension too). `ios/App/Shared/JarvisActivity.swift`, in both targets, has the activity's
-  data and the buttons' `LiveActivityIntent`s, which run in the app's process. Mute asks for a state (`SetMutedIntent(muted:)`), not a toggle: a tap on the watch reaches the iPhone twice, and a toggle would undo itself. It ends with the session; one
-  swiped away stays away until the next session. Logged under category `liveactivity`.
+  data and the buttons' `LiveActivityIntent`s, which run in the app's process. Mute asks for a state (`SetMutedIntent(muted:)`), not a toggle: a tap on the watch reaches the iPhone twice, and a toggle would undo itself. It ends with the session, and when
+  the app is quit from the app switcher (`applicationWillTerminate`; iOS leaves a quit app's Live Activities
+  up). After a crash it's cleared on the next launch. One swiped away stays away until the next session. Logged under category `liveactivity`.
 - Voice Isolation (`MicMode.swift`): iOS's Mic Modes (Standard, Voice Isolation, Wide Spectrum) run inside
   Apple's voice processing, which the `.voiceChat` session and LiveKit's engine already use, so Control Center
   offers Mic Mode for JARVIS while the mic is on. Apps can't set the mode (even in the iOS 27 SDK,
