@@ -50,6 +50,7 @@ final class VoiceSession: NSObject {
     private var presses = EarphoneDebouncer()
     private let routing = AudioRouting()
     private let controls = RemoteControls()
+    private let nowPlaying = NowPlaying()
     private let chime = ChimePlayer()
     let micMode = MicMode()
 
@@ -136,6 +137,7 @@ final class VoiceSession: NSObject {
         connection = "disconnected"; agentState = nil; muted = false; interrupted = false; startedAt = nil
         attempt = 0; outbox.removeAll(); presses.reset()
         controls.disable()
+        nowPlaying.clear()
         micMode.sessionEnded()
         Task {
             guard self.wanted == nil else { return }  // a new session started meanwhile
@@ -303,7 +305,7 @@ final class VoiceSession: NSObject {
         if let retryIn { e["retryIn"] = Int(retryIn * 1000) }
         emit("connection", e)
         if state == "connected" { flush() }
-        showNowPlaying()
+        summaryChanged()
     }
 
     // MARK: - The agent, captions and typed messages
@@ -313,7 +315,7 @@ final class VoiceSession: NSObject {
         agentState = state
         emit("agentState", ["state": state])
         flush()
-        showNowPlaying()
+        summaryChanged()
     }
 
     private func caption(_ r: Room, _ reader: TextStreamReader, from: String) async {
@@ -366,11 +368,11 @@ final class VoiceSession: NSObject {
             muted = true  // couldn't open the mic: stay muted and say so
             controls.setSystemMuted(true)
             emit("mute", ["muted": true, "source": "system"])
-            showNowPlaying()
+            summaryChanged()
             throw Failure(code: "NO_MICROPHONE", message: "The microphone couldn't start.")
         }
         emit("mute", ["muted": m, "source": source])
-        showNowPlaying()
+        summaryChanged()
         return m
     }
 
@@ -403,14 +405,14 @@ final class VoiceSession: NSObject {
             interrupted = true
             micMode.micStopped()
             emit("interruption", ["state": "began"])
-            showNowPlaying()
+            summaryChanged()
         case .interruptionEnded:
             // Take the audio back even without shouldResume: JARVIS is a call the user left running.
             routing.reactivate()
             interrupted = false
             emit("interruption", ["state": "ended"])
             if let r = room, connection == "connected", !muted { Task { _ = await micOn(r, true) } }
-            showNowPlaying()
+            summaryChanged()
         case .routeChanged(let output, let input, let reason):
             var d: [String: Any] = ["output": output, "reason": reason]
             if let input { d["input"] = input }
@@ -445,26 +447,17 @@ final class VoiceSession: NSObject {
         }
     }
 
-    // MARK: - Now Playing
+    // MARK: - Outside the page: the lock screen
 
-    private var summary: String {
-        if wanted == nil { return "Not connected" }
-        switch connection {
-        case "connecting": return "Connecting…"
-        case "reconnecting": return "Reconnecting…"
-        default: break
-        }
-        if interrupted { return "Mic paused for a call" }
-        if muted { return "Muted" }
-        switch agentState {
-        case "speaking": return "Speaking"
-        case "thinking": return "Thinking"
-        default: return "Listening"
-        }
+    /// What the session is doing, for the user, or nil with no session.
+    var summary: SessionSummary? {
+        SessionSummary(active: wanted != nil, connection: connection, agentState: agentState, muted: muted, interrupted: interrupted)
     }
 
-    private func showNowPlaying() {
-        if wanted != nil { controls.show(status: summary, muted: muted) }
+    /// Called after every change to the connection, the agent's state, the mute or an interruption: the one
+    /// place that keeps surfaces outside the page (the Now Playing card, a Live Activity later) up to date.
+    private func summaryChanged() {
+        if let s = summary { nowPlaying.show(s) }
     }
 }
 

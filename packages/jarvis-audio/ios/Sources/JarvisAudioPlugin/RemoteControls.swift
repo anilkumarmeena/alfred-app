@@ -14,8 +14,12 @@ let muteLog = Logger(subsystem: "com.anil.jarvis", category: "mute")
 ///   gets "Cannot control mic with AirPods". So the observer is added when this is created and again, by optIn(),
 ///   once the mic is recording and every session the engine uses exists. VoiceSession ignores it with no session.
 /// - Wired EarPods and other headsets: the play/pause remote commands, delivered to the app that is Now
-///   Playing, which a session playing JARVIS's voice is. The Now Playing card on the lock screen says what
-///   JARVIS is doing, and its play/pause button mutes too. These are only on during a session.
+///   Playing, which a session playing JARVIS's voice is. The lock screen's play/pause button (NowPlaying)
+///   sends the same commands, so it mutes too. These are only on during a session. play, pause and
+///   togglePlayPause all toggle: a headset's idea of play or pause can be stale, and the lock screen's
+///   button always shows the opposite of the mute, so a toggle is what it means anyway.
+/// Every other media command (next and previous track, skip, seek, scrubbing, rate) is switched off, so the
+/// lock screen shows no buttons that would do nothing in a live voice session.
 @MainActor
 final class RemoteControls {
     enum Press {
@@ -29,6 +33,12 @@ final class RemoteControls {
     private var echo: Bool?  // what setSystemMuted just gave iOS: its notification comes back and is dropped
     private let center = MPRemoteCommandCenter.shared()
     private var commands: [MPRemoteCommand] { [center.togglePlayPauseCommand, center.playCommand, center.pauseCommand] }
+    private var unused: [MPRemoteCommand] {
+        [center.nextTrackCommand, center.previousTrackCommand, center.skipForwardCommand, center.skipBackwardCommand,
+         center.seekForwardCommand, center.seekBackwardCommand, center.changePlaybackPositionCommand,
+         center.changePlaybackRateCommand, center.changeRepeatModeCommand, center.changeShuffleModeCommand,
+         center.stopCommand]
+    }
 
     init() { optIn() }
 
@@ -64,6 +74,7 @@ final class RemoteControls {
     func enable() {
         guard !enabled else { return }
         enabled = true
+        hideUnused()
         for command in commands {
             command.isEnabled = true
             let name = command === center.playCommand ? "play" : command === center.pauseCommand ? "pause" : "togglePlayPause"
@@ -83,8 +94,17 @@ final class RemoteControls {
             command.isEnabled = false
         }
         setSystemMuted(false)  // stored across sessions otherwise
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
-        MPNowPlayingInfoCenter.default().playbackState = .stopped
+    }
+
+    /// Off, with no targets: the lock screen leaves out (or at most dims) a command that's disabled. Skip
+    /// intervals are emptied too, or iOS draws ±15 s buttons in place of next and previous.
+    private func hideUnused() {
+        center.skipForwardCommand.preferredIntervals = []
+        center.skipBackwardCommand.preferredIntervals = []
+        for command in unused {
+            command.removeTarget(nil)
+            command.isEnabled = false
+        }
     }
 
     /// Keeps the system's input mute in step with the app's, taps on the screen included, so the next stem press
@@ -99,16 +119,5 @@ final class RemoteControls {
             echo = nil
             muteLog.error("setInputMuted \(muted, privacy: .public): \(error, privacy: .public)")
         }
-    }
-
-    /// The lock screen's Now Playing card.
-    func show(status: String, muted: Bool) {
-        MPNowPlayingInfoCenter.default().nowPlayingInfo = [
-            MPMediaItemPropertyTitle: "JARVIS",
-            MPMediaItemPropertyArtist: status,
-            MPNowPlayingInfoPropertyIsLiveStream: true,
-            MPNowPlayingInfoPropertyPlaybackRate: muted ? 0.0 : 1.0,
-        ]
-        MPNowPlayingInfoCenter.default().playbackState = muted ? .paused : .playing
     }
 }

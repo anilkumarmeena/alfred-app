@@ -75,7 +75,14 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   (subsystem `com.anil.jarvis`, category `mute`) with its value, iOS's mute state and the input route
   (`BluetoothHFP` for AirPods, `MicrophoneBuiltIn` for the phone). Wired and other headsets send
   `MPRemoteCommandCenter` play, pause and toggle commands, which toggle the mute and play the page's
-  falling or rising chime. The lock screen's Now Playing card shows Listening, Muted, Speaking and so on.
+  falling or rising chime. Every other media command (next/previous track, skip, seek, scrubbing, rate) is
+  switched off, so the lock screen shows no buttons that would do nothing.
+- Lock screen (`NowPlaying.swift`): during a session the Now Playing card shows **JARVIS**, what it's doing
+  (Listening, Muted, Speaking, Thinking, Connecting…, Mic paused for a call; `SessionSummary` in the core), the
+  app icon as artwork (the `NowPlayingArtwork` image in the app's asset catalog, a copy of the icon) and LIVE.
+  Its button is pause while the mic is heard and play while muted, and either one toggles the mute. The
+  AirPlay/route button is iOS's own. The card is cleared when the session ends. `VoiceSession.summaryChanged`
+  is the one place it's updated from, ready for a Live Activity to follow the same summary.
 - Voice Isolation (`MicMode.swift`): iOS's Mic Modes (Standard, Voice Isolation, Wide Spectrum) run inside
   Apple's voice processing, which the `.voiceChat` session and LiveKit's engine already use, so Control Center
   offers Mic Mode for JARVIS while the mic is on. Apps can't set the mode (even in the iOS 27 SDK,
@@ -189,7 +196,7 @@ cd android
 |---|---|
 | `npm test` | vitest: the page hook (`web-hook/native.ts`) against a fake plugin. |
 | `npm run typecheck` | TypeScript for the config, the shell page, the hook and the plugin API. |
-| `npm run test:ios` | `swift test` for JarvisAudioCore: server addresses, token replies, reconnect timing, earphone debouncing, captions, the chime. `npm run test:ios-direct` does the same with plain `swiftc` + `xctest`. |
+| `npm run test:ios` | `swift test` for JarvisAudioCore: server addresses, token replies, reconnect timing, earphone debouncing, captions, the chime, the lock screen's status line. `npm run test:ios-direct` does the same with plain `swiftc` + `xctest`. |
 | `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle. `npm run test:android-direct` compiles it with Android Studio's bundled Kotlin compiler instead, without Gradle. |
 | `npm run check:web-patch` | Applies `web-hook/jarvis-web.patch` to a copy of `../jarvis/web`, then typechecks it and runs its tests. |
 | `npm run check:server-patch` | Applies `server-hook/jarvis-native-push.patch` to a copy of the jarvis Python package and tests, then runs them with the jarvis project's environment. |

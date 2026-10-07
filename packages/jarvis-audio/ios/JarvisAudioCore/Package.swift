@@ -2,7 +2,7 @@
 import PackageDescription
 
 // The plugin's plain-Swift logic: server addresses, token replies, push registration, reconnect timing,
-// earphone debouncing, captions and the chime. No Capacitor or LiveKit, so `swift test` here runs on the Mac with nothing to fetch.
+// earphone debouncing, captions, the chime and the session summary. No Capacitor or LiveKit, so `swift test` here runs on the Mac with nothing to fetch.
 let package = Package(
     name: "JarvisAudioCore",
     platforms: [.iOS(.v17), .macOS(.v14)],

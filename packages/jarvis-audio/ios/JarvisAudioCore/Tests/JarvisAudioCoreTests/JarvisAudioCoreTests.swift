@@ -232,3 +232,32 @@ final class CaptionsTests: XCTestCase {
         XCTAssertNil(AgentStates.parse(nil))
     }
 }
+
+final class SessionSummaryTests: XCTestCase {
+    private func summary(_ connection: String = "connected", agent: String? = "listening", muted: Bool = false,
+                         interrupted: Bool = false) -> SessionSummary? {
+        SessionSummary(active: true, connection: connection, agentState: agent, muted: muted, interrupted: interrupted)
+    }
+
+    func testNothingWithoutASession() {
+        XCTAssertNil(SessionSummary(active: false, connection: "disconnected", agentState: nil, muted: false, interrupted: false))
+    }
+
+    func testStatus() {
+        XCTAssertEqual(summary()?.status, "Listening")
+        XCTAssertEqual(summary(agent: nil)?.status, "Listening")
+        XCTAssertEqual(summary(agent: "speaking")?.status, "Speaking")
+        XCTAssertEqual(summary(agent: "thinking")?.status, "Thinking")
+        XCTAssertEqual(summary(agent: "speaking", muted: true)?.status, "Muted")
+        XCTAssertEqual(summary(muted: true, interrupted: true)?.status, "Mic paused for a call")
+        XCTAssertEqual(summary("connecting", muted: true)?.status, "Connecting…")
+        XCTAssertEqual(summary("reconnecting")?.phase, .reconnecting)
+    }
+
+    func testPlayingFollowsTheMuteOnly() {
+        XCTAssertEqual(summary()?.playing, true)
+        XCTAssertEqual(summary("reconnecting")?.playing, true)
+        XCTAssertEqual(summary(interrupted: true)?.playing, true)
+        XCTAssertEqual(summary(muted: true)?.playing, false)
+    }
+}
