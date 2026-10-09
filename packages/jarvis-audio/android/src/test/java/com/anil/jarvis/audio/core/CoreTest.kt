@@ -114,6 +114,29 @@ class ChimeTest {
     }
 }
 
+class MicSyncTest {
+    @Test fun trackFollowsTheMuteAndTheInterruption() {
+        assertTrue(MicSync.target(muted = false, interrupted = false))
+        assertFalse(MicSync.target(muted = true, interrupted = false))
+        assertFalse(MicSync.target(muted = false, interrupted = true))
+    }
+
+    @Test fun heardWhileMutedOrPausedSwitchesItOffAgain() {
+        val s = MicSync(settleMs = 2_000)
+        assertTrue(s.heardWhileOff(10_000, muted = true, interrupted = false))
+        assertTrue(s.heardWhileOff(10_000, muted = false, interrupted = true))
+        assertFalse(s.heardWhileOff(10_000, muted = false, interrupted = false))
+    }
+
+    @Test fun reportsJustAfterAChangeAreAboutTheOldState() {
+        val s = MicSync(settleMs = 2_000)
+        s.changed(5_000)
+        assertFalse(s.settled(6_000))
+        assertFalse(s.heardWhileOff(6_000, muted = true, interrupted = false))
+        assertTrue(s.settled(7_000))
+    }
+}
+
 class CaptionsTest {
     @Test fun streamsWholeLines() {
         val c = Captions()

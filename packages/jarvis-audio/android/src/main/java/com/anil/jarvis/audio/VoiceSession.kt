@@ -13,6 +13,7 @@ import com.anil.jarvis.audio.core.Captions
 import com.anil.jarvis.audio.core.DisconnectCause
 import com.anil.jarvis.audio.core.EarphoneDebouncer
 import com.anil.jarvis.audio.core.Grant
+import com.anil.jarvis.audio.core.MicSync
 import com.anil.jarvis.audio.core.ReconnectPolicy
 import com.anil.jarvis.audio.core.ServerAddress
 import com.anil.jarvis.audio.core.TokenError
@@ -29,7 +30,9 @@ import io.livekit.android.room.Room
 import io.livekit.android.room.datastream.StreamTextOptions
 import io.livekit.android.room.datastream.incoming.TextStreamReceiver
 import io.livekit.android.room.participant.ConnectionQuality
+import io.livekit.android.room.participant.LocalParticipant
 import io.livekit.android.room.participant.Participant
+import io.livekit.android.room.track.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -88,6 +91,8 @@ object VoiceSession {
     private var levelsJob: Job? = null
     private var network: ConnectivityManager.NetworkCallback? = null
     private val presses = EarphoneDebouncer()
+    private var sync = MicSync()  // keeps the mic track and the mute / interruption the page shows in step
+    private var switching = 0  // mic track switches in flight: the room's reports of them aren't news
 
     var connection = "disconnected"; private set
     var agentState: String? = null; private set
@@ -127,6 +132,7 @@ object VoiceSession {
         wanted = w
         val gen = ++generation
         muted = startMuted
+        sync = MicSync()
         VoiceService.start(app)  // now, while the app is in the foreground, as Android 14 requires for the mic
         watchNetwork()
         try {
@@ -205,6 +211,7 @@ object VoiceSession {
         if (startedAt == null) startedAt = System.currentTimeMillis()
         setConnection("connected", null)
         startLevels()
+        applyMic()  // a mute or a call while it joined
     }
 
     private suspend fun fetchToken(w: Wanted): Grant = withContext(Dispatchers.IO) {
@@ -239,7 +246,17 @@ object VoiceSession {
         if (room !== r) return
         when (e) {
             is RoomEvent.Reconnecting -> setConnection("reconnecting", "network")
-            is RoomEvent.Reconnected -> setConnection("connected", null)
+            is RoomEvent.Reconnected -> {
+                setConnection("connected", null)
+                scope.launch { applyMic() }  // a mute or a call while it was reconnecting
+            }
+            is RoomEvent.ActiveSpeakersChanged ->
+                if (e.speakers.any { it is LocalParticipant } && sync.heardWhileOff(SystemClock.elapsedRealtime(), muted, interrupted)) {
+                    Log.i(TAG, "mic heard while off: switching it off again")
+                    scope.launch { applyMic(force = true) }
+                }
+            is RoomEvent.TrackMuted -> if (e.participant is LocalParticipant && e.publication.source == Track.Source.MICROPHONE) trackMuteChanged(true)
+            is RoomEvent.TrackUnmuted -> if (e.participant is LocalParticipant && e.publication.source == Track.Source.MICROPHONE) trackMuteChanged(false)
             is RoomEvent.Disconnected -> roomLost(r, e.reason)
             is RoomEvent.ParticipantConnected ->
                 if (e.participant.kind == Participant.Kind.AGENT) agentChanged(e.participant.attributes[AGENT_STATE])
@@ -379,11 +396,13 @@ object VoiceSession {
     suspend fun setMuted(m: Boolean, source: String): Boolean {
         if (wanted == null) throw Failure("NOT_CONNECTED", "No session is running.")
         muted = m
-        val r = room
-        // With no room yet (reconnecting) or a call holding the mic, the choice is kept and applied later.
-        val opened = r == null || connection != "connected" || interrupted || micOn(r, !m)
+        sync.changed(SystemClock.elapsedRealtime())
+        // The track follows now. With no room yet (reconnecting), join and Reconnected apply it; with a call
+        // holding the mic it stays off until the call is over.
+        val opened = applyMic()
         if (!opened && !m) {
             muted = true  // couldn't open the mic: stay muted and say so
+            sync.changed(SystemClock.elapsedRealtime())
             emit("mute", JSObject().put("muted", true).put("source", "system"))
             VoiceService.update()
             throw Failure("NO_MICROPHONE", "The microphone couldn't start.")
@@ -391,6 +410,43 @@ object VoiceSession {
         emit("mute", JSObject().put("muted", m).put("source", source))
         VoiceService.update()
         return m
+    }
+
+    /**
+     * Switches the mic track to what the page shows ([MicSync.target]): after every mute, interruption and
+     * (re)connect, so a mute made while reconnecting still stops the mic. [force] switches it even when LiveKit
+     * says it's already that way. False if the track couldn't be switched.
+     */
+    private suspend fun applyMic(force: Boolean = false): Boolean {
+        val r = room ?: return true
+        if (connection != "connected") return true  // join and Reconnected apply it
+        val on = MicSync.target(muted, interrupted)
+        if (!force && r.localParticipant.isMicrophoneEnabled == on) return true
+        switching++
+        val ok = try { micOn(r, on) } finally { switching-- }
+        // The mute or the interruption changed while it switched: catch up.
+        if (ok && room === r && MicSync.target(muted, interrupted) != on) return applyMic()
+        return ok
+    }
+
+    /**
+     * LiveKit muted or unmuted the mic track. Switches made here are no news; any other (the server muting the
+     * track, or LiveKit stopping a mic that failed) is followed, so the page never says Listening while nothing is
+     * sent, and a track that comes back on while it should be off is switched off again.
+     */
+    private fun trackMuteChanged(isMuted: Boolean) {
+        if (switching > 0 || connection != "connected" || !sync.settled(SystemClock.elapsedRealtime())) return
+        val on = MicSync.target(muted, interrupted)
+        if (!isMuted && !on) {
+            Log.i(TAG, "mic track unmuted while off: switching it off again")
+            scope.launch { applyMic(force = true) }
+        } else if (isMuted && on) {
+            Log.i(TAG, "mic track muted by the room: showing muted")
+            muted = true
+            sync.changed(SystemClock.elapsedRealtime())
+            emit("mute", JSObject().put("muted", true).put("source", "system"))
+            VoiceService.update()
+        }
     }
 
     /** A headset button press, from [VoiceService]'s media session or its notification. */
@@ -414,9 +470,9 @@ object VoiceSession {
     private fun interrupt(began: Boolean) {
         if (wanted == null) return
         interrupted = began
+        sync.changed(SystemClock.elapsedRealtime())
         emit("interruption", JSObject().put("state", if (began) "began" else "ended"))
-        val r = room
-        if (r != null && connection == "connected") scope.launch { micOn(r, !began && !muted) }
+        scope.launch { applyMic(force = !began) }  // with no room yet, join applies it
         VoiceService.update()
     }
 

@@ -127,6 +127,53 @@ describe("bindNative", () => {
     expect(s.connected()).toBe(true);
   });
 
+  it("resyncs from the plugin: a stale Mic paused or mute is put right", async () => {
+    let status = { connection: "connected", agent: "listening", muted: false, interrupted: true };
+    const { plugin, fire } = fakePlugin({ getStatus: async () => status });
+    const { page, state } = fakePage();
+    const s = bindNative(plugin, page);
+    await s.connect({ passcode: "1" });
+    fire("interruption", { state: "began" });
+    fire("mute", { muted: true, source: "earphone" });
+    expect(state).toMatchObject({ paused: "recovering", muted: true });
+    // The call ended and the user unmuted while the page was off screen, and it missed the events.
+    status = { ...status, interrupted: false, muted: false };
+    await s.adopt();
+    expect(state).toMatchObject({ paused: "", muted: false, agent: "listening", connected: true });
+    expect(s.muted()).toBe(false);
+  });
+
+  it("shows the plugin's mute when a mute is refused", async () => {
+    const { plugin } = fakePlugin({
+      setMuted: () => Promise.reject(Object.assign(new Error("The microphone couldn't start."), { code: "NO_MICROPHONE" })),
+      getStatus: async () => ({ connection: "connected", muted: true, interrupted: false }),
+    });
+    const { page, state } = fakePage();
+    const s = bindNative(plugin, page);
+    await s.connect({ passcode: "1" });
+    await s.setMuted(false);
+    expect(state.muted).toBe(true);
+    expect(s.muted()).toBe(true);
+  });
+
+  it("ends a session that ended while the page wasn't looking, but not one still starting", async () => {
+    let finish!: () => void;
+    const { plugin } = fakePlugin({
+      start: () => new Promise((resolve) => { finish = () => resolve({ connection: "connected" }); }),
+      getStatus: async () => ({ connection: "disconnected", muted: false, interrupted: false }),
+    });
+    const { page, state } = fakePage();
+    const s = bindNative(plugin, page);
+    const starting = s.connect({ passcode: "1" });
+    await s.adopt();
+    expect(state.ended).toEqual([]);
+    expect(s.connected()).toBe(true);
+    finish(); await starting;
+    await s.adopt();
+    expect(state.ended).toEqual(["Connection lost. Tap the core to reconnect."]);
+    expect(s.connected()).toBe(false);
+  });
+
   it("keeps the latest voice levels", async () => {
     const { plugin, fire } = fakePlugin(), { page } = fakePage();
     const s = bindNative(plugin, page);

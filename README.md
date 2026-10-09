@@ -102,7 +102,14 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   **Mic: …** pill from them during a session (the app draws no UI over the page). Each change and the voice-processing state at mic start are logged (subsystem
   `com.anil.jarvis`, category `micmode`).
 - Interruptions: a call or Siri pauses the mic ("Mic paused"), and when it ends the session is reactivated.
-  Route changes (AirPods in or out) go to the page as `route` events. A media services reset rejoins.
+  iOS doesn't promise to report every interruption's end, so a "Mic paused" is also cleared when iOS hands the
+  audio back as the app comes on screen or the user taps to unmute, and when the server hears the mic (LiveKit's
+  speaking updates include this phone). Route changes (AirPods in or out) go to the page as `route` events. A
+  media services reset rejoins.
+- The mic track follows the mute (`MicSync` in the core): after every mute, reconnect and interruption the plugin
+  switches it to match, so a mute made while reconnecting or during a call really stops the mic, and if the room
+  says otherwise (the track unmuted, or the server hearing it, while muted) it's muted again. A track the room
+  mutes itself shows as muted on the page.
 - Reconnects: LiveKit resumes short drops itself. If the room is lost, the plugin fetches a fresh token and
   rejoins, after 1, 2, 4, 8 and 15 seconds, then every 30, for as long as the session is wanted. It retries
   straight away when `NWPathMonitor` sees the network come back, and stops only for a refused passcode.
@@ -135,7 +142,7 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
 | `shell/` | The bundled pages: first-run address prompt and the can't-reach-the-Mac page. |
 | `packages/jarvis-audio/` | The plugin: `src/definitions.ts` (the TypeScript API), `ios/Sources/JarvisAudioPlugin` (Swift), `ios/JarvisAudioCore` (plain-Swift logic and its tests), `android/src/main/java/com/anil/jarvis/audio` (Kotlin; `core/` is the plain-Kotlin logic, tested in `android/src/test`). |
 | `ios/`, `android/` | The native projects from `npx cap add`, with the changes below. |
-| `web-hook/` | The page's side: `native.ts` and `jarvis-web.patch`, see [web-hook/README.md](web-hook/README.md). |
+| `web-hook/` | The page's side: `native.ts`, `jarvis-web.patch`, `jarvis-preferences.patch` and `jarvis-mic-sync.patch`, see [web-hook/README.md](web-hook/README.md). |
 | `server-hook/` | The jarvis server's side of app notifications: `jarvis-native-push.patch` (APNs), see [server-hook/README.md](server-hook/README.md). |
 | `tests/` | vitest tests for `web-hook/native.ts`. |
 | `scripts/` | Test and build helpers (below). |
@@ -166,6 +173,14 @@ service.
    key from the Apple Developer account. See [server-hook/README.md](server-hook/README.md). Until it's
    applied the app's token is refused with a 404 (logged in Xcode's console) and nothing else changes. Android
    still has no push: that needs FCM (a Firebase project and `google-services.json`) on both sides.
+4. **Settings → Preferences:** `web-hook/jarvis-preferences.patch` puts do not disturb, the voice settings
+   (with Voice Isolation) and the background-work settings on one Preferences page, and adds the small
+   `hold_status` panel action it reads do not disturb with. See [web-hook/README.md](web-hook/README.md#settings--preferences).
+   Nothing in the app changes for it: apply it on the Mac and `make services-restart`.
+5. **Mic state sync:** `web-hook/jarvis-mic-sync.patch` has the page re-read the plugin's state whenever it comes
+   back on screen (events sent while the web view was suspended can be lost), show the plugin's mute when a mute
+   is refused, and ask for the mic back when the core is tapped during "Mic paused". See
+   [web-hook/README.md](web-hook/README.md#mic-state-sync). Apply it on the Mac and `make web-build`.
 
 ## Build
 
@@ -206,6 +221,8 @@ cd android
 | `npm run test:ios` | `swift test` for JarvisAudioCore: server addresses, token replies, reconnect timing, captions, the chime, the Live Activity's status line. `npm run test:ios-direct` does the same with plain `swiftc` + `xctest`. |
 | `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle. `npm run test:android-direct` compiles it with Android Studio's bundled Kotlin compiler instead, without Gradle. |
 | `npm run check:web-patch` | Applies `web-hook/jarvis-web.patch` to a copy of `../jarvis/web`, then typechecks it and runs its tests. |
+| `npm run check:preferences-patch` | Applies `web-hook/jarvis-preferences.patch` to a copy of the jarvis repo, then typechecks the web app and runs its tests and the panel's Python tests. |
+| `npm run check:mic-sync-patch` | Applies `web-hook/jarvis-mic-sync.patch` to a copy of `../jarvis/web`, checks its `bindNative` matches `web-hook/native.ts`, then typechecks it and runs its tests. |
 | `npm run check:server-patch` | Applies `server-hook/jarvis-native-push.patch` to a copy of the jarvis Python package and tests, then runs them with the jarvis project's environment. |
 
 ## Install on the iPhone

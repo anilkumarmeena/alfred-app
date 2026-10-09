@@ -236,3 +236,33 @@ final class SessionSummaryTests: XCTestCase {
         XCTAssertEqual(summary("reconnecting")?.phase, .reconnecting)
     }
 }
+
+final class MicSyncTests: XCTestCase {
+    func testTrackFollowsTheMute() {
+        XCTAssertEqual(MicSync.target(muted: false, interrupted: false), true)
+        XCTAssertEqual(MicSync.target(muted: true, interrupted: false), false)
+        XCTAssertEqual(MicSync.target(muted: true, interrupted: true), false)  // muted during a call: still stopped
+        XCTAssertNil(MicSync.target(muted: false, interrupted: true))  // iOS has the input until the call is over
+    }
+
+    func testHeardWhilePausedEndsTheInterruption() {
+        var s = MicSync(settle: 2)
+        s.changed(at: 100)
+        XCTAssertEqual(s.heard(at: 105, muted: false, interrupted: true), MicSync.Fix(interruptionOver: true))
+        XCTAssertEqual(s.heard(at: 105, muted: false, interrupted: false), MicSync.Fix())
+    }
+
+    func testHeardWhileMutedMutesAgain() {
+        let s = MicSync()
+        XCTAssertEqual(s.heard(at: 50, muted: true, interrupted: false), MicSync.Fix(muteAgain: true))
+        XCTAssertEqual(s.heard(at: 50, muted: true, interrupted: true), MicSync.Fix(interruptionOver: true, muteAgain: true))
+    }
+
+    func testReportsJustAfterAChangeAreAboutTheOldState() {
+        var s = MicSync(settle: 2)
+        s.changed(at: 10)
+        XCTAssertFalse(s.settled(at: 11))
+        XCTAssertEqual(s.heard(at: 11, muted: true, interrupted: true), MicSync.Fix())
+        XCTAssertTrue(s.settled(at: 12))
+    }
+}

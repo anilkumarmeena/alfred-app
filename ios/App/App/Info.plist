@@ -52,6 +52,10 @@
 	<!-- The session's Live Activity (SessionActivity, drawn by the JarvisWidget extension). -->
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>JARVIS uses the camera so you can take a photo to show it.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>JARVIS opens your photo library so you can pick a picture to show it.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

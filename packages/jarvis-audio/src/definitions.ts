@@ -28,7 +28,8 @@ export type EndReason =
   | "server"  // the Mac refused or closed the connection
   | "microphone";  // no mic permission, or the mic couldn't start
 
-/** Who changed the mute. */
+/** Who changed the mute. "system": the mic couldn't start, or the room muted the mic track itself (the server, or
+ * LiveKit after the mic failed), and the page should show it muted. */
 export type MuteSource = "user" | "earphone" | "system";
 
 export interface StartOptions {
@@ -46,8 +47,13 @@ export interface SessionStatus {
   connection: ConnectionState;
   /** Unset until the agent has said. */
   agent?: AgentState;
+  /** The mic track follows this: muted means nothing is sent, even after a reconnect or a call. */
   muted: boolean;
-  /** The mic is held by something else right now (a phone call, Siri): it comes back on its own. */
+  /**
+   * The mic is held by something else right now (a phone call, Siri): it comes back on its own. On iOS, where an
+   * interruption's end isn't always reported, it's also cleared when iOS hands the audio back as the app comes on
+   * screen or the user unmutes, and when the server hears the mic. The page re-reads this when it's shown again.
+   */
   interrupted: boolean;
   /** When the current session started, in ms since the epoch. */
   startedAt?: number;
@@ -133,6 +139,10 @@ export interface JarvisAudioPlugin {
   start(options: StartOptions): Promise<SessionStatus>;
   /** Ends the session and stops the mic. */
   stop(): Promise<void>;
+  /**
+   * Mutes or unmutes the mic track straight away (while reconnecting, as soon as the room is back). On iOS, unmuting
+   * during an interruption asks for the audio back, which ends an interruption iOS forgot to end.
+   */
   setMuted(options: { muted: boolean }): Promise<{ muted: boolean }>;
   toggleMute(): Promise<{ muted: boolean }>;
   /** Sends a typed message on lk.chat. Before the agent is listening it is queued, like the page does. */

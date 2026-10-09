@@ -17,6 +17,8 @@
     "build:android": "cd android && ./gradlew assembleDebug",
     "check:web-patch": "sh scripts/check-web-patch.sh",
     "check:server-patch": "sh scripts/check-server-patch.sh",
+    "check:preferences-patch": "sh scripts/check-preferences-patch.sh",
+    "check:mic-sync-patch": "sh scripts/check-mic-sync-patch.sh",
     "ios": "cap open ios",
     "android": "cap open android"
   },

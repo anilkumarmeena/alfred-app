@@ -39,9 +39,14 @@ final class AudioRouting {
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    /// After an interruption, iOS leaves the session inactive until the app asks again.
-    func reactivate() {
-        do { try session.setActive(true) } catch { NSLog("JarvisAudio: reactivate failed: \(error)") }
+    /// After an interruption, iOS leaves the session inactive until the app asks again. False while something with
+    /// a higher priority (a phone call, Siri) still holds the audio.
+    @discardableResult
+    func reactivate() -> Bool {
+        do { try session.setActive(true); return true } catch {
+            NSLog("JarvisAudio: reactivate failed: \(error)")
+            return false
+        }
     }
 
     /// What's in use now, e.g. ("AirPods Pro", "AirPods Pro") or ("Speaker", "iPhone Microphone").

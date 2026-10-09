@@ -47,6 +47,8 @@ final class VoiceSession: NSObject {
     private var retryTask: Task<Void, Never>?
     private var levelsTask: Task<Void, Never>?
     private var path: NWPathMonitor?
+    private var sync = MicSync()  // keeps the mic track and the mute / interruption the page shows in step
+    private var switching = 0  // mic track switches in flight: the room's reports of them aren't news
     private let routing = AudioRouting()
     private let airpods = AirPodsMute()
     private let chime = ChimePlayer()
@@ -103,6 +105,7 @@ final class VoiceSession: NSObject {
         generation += 1
         let gen = generation
         muted = startMuted
+        sync = MicSync()
         micMode.sessionStarted()
         // With iOS's mute matching ours before the engine opens the mic. (micOn opts the recording session in to
         // the AirPods gesture.)
@@ -192,6 +195,7 @@ final class VoiceSession: NSObject {
         if startedAt == nil { startedAt = Date() }
         setConnection("connected", reason: nil)
         startLevels()
+        await applyMic()  // a mute while it joined
     }
 
     private func fetchToken(_ w: Wanted) async throws -> Grant {
@@ -355,14 +359,18 @@ final class VoiceSession: NSObject {
     func setMuted(_ m: Bool, source: String) async throws -> Bool {
         guard wanted != nil else { throw Failure(code: "NOT_CONNECTED", message: "No session is running.") }
         muted = m
+        sync.changed(at: Self.now)
         // iOS is told about every change, taps on the screen included, so it agrees with the app and the next stem
         // press goes the right way. The notification it sends back is dropped as an echo (AirPodsMute).
         airpods.setSystemMuted(m)
-        // With no room yet (reconnecting) or a call holding the audio, the choice is kept and applied later.
-        var opened = true
-        if let r = room, connection == "connected", !interrupted { opened = await micOn(r, !m) }
+        // Unmuting from the screen while a call or Siri seems to hold the audio: if iOS hands it back, that's over.
+        if !m, interrupted, source == "user" { takeAudioBack("unmuted") }
+        // The track follows now, a mute during a call included. With no room yet (reconnecting), join and
+        // roomDidReconnect apply it; an unmute during a call is applied when the call is over.
+        let opened = await applyMic()
         if !opened, !m {
             muted = true  // couldn't open the mic: stay muted and say so
+            sync.changed(at: Self.now)
             airpods.setSystemMuted(true)
             emit("mute", ["muted": true, "source": "system"])
             summaryChanged()
@@ -388,6 +396,52 @@ final class VoiceSession: NSObject {
         chime.play(muted: m)
     }
 
+    private static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    /// Switches the mic track to what the page shows (MicSync.target): after every mute, interruption and
+    /// (re)connect, so a mute made while reconnecting or during a call still stops the mic. `force` switches it even
+    /// when LiveKit says it's already that way. False if the track couldn't be switched.
+    @discardableResult
+    private func applyMic(force: Bool = false) async -> Bool {
+        guard let r = room, connection == "connected", let on = MicSync.target(muted: muted, interrupted: interrupted) else { return true }
+        if !force, r.localParticipant.isMicrophoneEnabled() == on { return true }
+        switching += 1
+        let ok = await micOn(r, on)
+        switching -= 1
+        // The mute or the interruption changed while it switched: catch up.
+        if ok, room === r, let next = MicSync.target(muted: muted, interrupted: interrupted), next != on { return await applyMic() }
+        return ok
+    }
+
+    /// LiveKit muted or unmuted the mic track. Switches made here are no news; any other (the server muting the
+    /// track, or LiveKit stopping a mic that failed) is followed, so the page never says Listening while nothing
+    /// is sent, and a track that comes back on while the user has it muted is muted again.
+    private func trackMuteChanged(_ isMuted: Bool) {
+        guard switching == 0, connection == "connected", sync.settled(at: Self.now) else { return }
+        if !isMuted, muted {
+            muteLog.info("mic track unmuted while muted: muting it again")
+            Task { await applyMic(force: true) }
+        } else if isMuted, !muted, !interrupted {
+            muteLog.info("mic track muted by the room: showing muted")
+            muted = true
+            sync.changed(at: Self.now)
+            airpods.setSystemMuted(true)
+            emit("mute", ["muted": true, "source": "system"])
+            summaryChanged()
+        }
+    }
+
+    /// The server heard this device's mic, so it's live and sending, whatever the app thought.
+    private func micHeard() {
+        let fix = sync.heard(at: Self.now, muted: muted, interrupted: interrupted)
+        if fix.interruptionOver {
+            interruptionOver("the mic is heard")  // switches the track off again too if it's muted
+        } else if fix.muteAgain {
+            muteLog.info("mic heard while muted: muting it again")
+            Task { await applyMic(force: true) }
+        }
+    }
+
     // MARK: - The audio session
 
     private func audioEvent(_ e: AudioRouting.Event) {
@@ -395,31 +449,55 @@ final class VoiceSession: NSObject {
         switch e {
         case .interruptionBegan:
             interrupted = true
+            sync.changed(at: Self.now)
             micMode.micStopped()
             emit("interruption", ["state": "began"])
             summaryChanged()
         case .interruptionEnded:
             // Take the audio back even without shouldResume: JARVIS is a call the user left running.
             routing.reactivate()
-            interrupted = false
-            emit("interruption", ["state": "ended"])
-            if let r = room, connection == "connected", !muted { Task { _ = await micOn(r, true) } }
-            summaryChanged()
+            interruptionOver("ended")
         case .routeChanged(let output, let input, let reason):
             var d: [String: Any] = ["output": output, "reason": reason]
             if let input { d["input"] = input }
             emit("route", d)
         case .mediaServicesReset:
-            // The audio daemon restarted: everything audio is gone. Set the session up again and rejoin.
-            try? routing.activate()
+            // The audio daemon restarted: everything audio is gone, an interruption with it. Set the session up
+            // again and rejoin.
+            if (try? routing.activate()) != nil, interrupted { interruptionOver("media services reset") }
             if let r = room { drop(r) }
             retryLater()
         }
     }
 
+    /// The call, Siri or alarm is over: the page stops saying "Mic paused", and the mic comes back unless the user
+    /// muted it meanwhile (the switch on is forced, as the input may need it to start again).
+    private func interruptionOver(_ why: String) {
+        if interrupted {
+            NSLog("JarvisAudio: interruption over (\(why))")
+            interrupted = false
+            sync.changed(at: Self.now)
+            emit("interruption", ["state": "ended"])
+            summaryChanged()
+        }
+        Task { await applyMic(force: true) }
+    }
+
+    /// iOS doesn't promise an end to every interruption it starts, and one that never comes would leave the page
+    /// saying "Mic paused" for good. So when the app comes back on screen, or the user unmutes, it asks for the
+    /// audio again: if iOS hands it over, nothing holds it any more. (While a call is on, iOS refuses.) The other
+    /// way out is the server hearing the mic (micHeard).
+    private func takeAudioBack(_ why: String) {
+        guard interrupted, wanted != nil else { return }
+        if routing.reactivate() { interruptionOver(why) }
+    }
+
     // MARK: - Voice levels for the reactor, only while on screen
 
-    @objc private func appActive() { startLevels() }
+    @objc private func appActive() {
+        takeAudioBack("app active")
+        startLevels()
+    }
 
     private func startLevels() {
         guard levelsTask == nil, room != nil else { return }
@@ -459,7 +537,21 @@ extension VoiceSession: RoomDelegate {
     }
 
     nonisolated func roomDidReconnect(_ room: Room) {
-        Task { @MainActor in if self.room === room { self.setConnection("connected", reason: nil) } }
+        Task { @MainActor in
+            guard self.room === room else { return }
+            self.setConnection("connected", reason: nil)
+            await self.applyMic()  // a mute while it was reconnecting
+        }
+    }
+
+    nonisolated func room(_ room: Room, didUpdateSpeakingParticipants participants: [Participant]) {
+        guard participants.contains(where: { $0 is LocalParticipant }) else { return }
+        Task { @MainActor in if self.room === room { self.micHeard() } }
+    }
+
+    nonisolated func room(_ room: Room, participant: Participant, trackPublication: TrackPublication, didUpdateIsMuted isMuted: Bool) {
+        guard participant is LocalParticipant, trackPublication.source == .microphone else { return }
+        Task { @MainActor in if self.room === room { self.trackMuteChanged(isMuted) } }
     }
 
     nonisolated func room(_ room: Room, didDisconnectWithError error: LiveKitError?) {
