@@ -76,6 +76,15 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   `AVAudioApplication.setInputMuted`, dropping the notification that echoes it back. Each notification is logged
   (subsystem `com.anil.jarvis`, category `mute`) with its value, iOS's mute state and the input route
   (`BluetoothHFP` for AirPods, `MicrophoneBuiltIn` for the phone).
+- Speaker off (`setSpeaker`, `start({ speakerOff })`): JARVIS replies only in the transcript. The plugin asks for it
+  in `/api/token`'s request (`speaker: "off"`), so the greeting is silent too, and changes it during a session with
+  its `jarvis.speaker` participant attribute; the agent then makes no speech at all. The agent's track also plays at
+  volume 0, so a reply already being spoken stops at once, and the Live Activity's mute plays no chime.
+- Phone calls (`CallWatch.swift`, `CallQuiet` in the core): `CXCallObserver` sees a call ringing, dialling or on
+  (FaceTime and other CallKit apps too), and the plugin mutes the mic and turns the speaker off before iOS even
+  interrupts the audio. When the last call ends it sends a `call` event with what they were before (also in
+  `getStatus().afterCall`), and the page offers to turn them back on; `restoreAfterCall({ restore })` is the answer.
+  Changing either meanwhile closes the offer. Android has neither yet: the page hides its speaker button there.
 - No Now Playing: the app takes no `MPRemoteCommandCenter` commands, so iOS shows no media card for it (that
   card always keeps dimmed ⏮ ⏭ slots an app can't remove, and doubled up with the Live Activity). The cost: the
   play/pause button of wired EarPods and other Bluetooth headsets goes to the last media app, not JARVIS.

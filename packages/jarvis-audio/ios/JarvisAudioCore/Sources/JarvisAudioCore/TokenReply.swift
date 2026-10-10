@@ -40,9 +40,10 @@ public enum TokenError: Error, Equatable {
 }
 
 public enum TokenReply {
-    /// The request body, as the page sends it.
-    public static func body(passcode: String, device: String) -> Data {
-        (try? JSONSerialization.data(withJSONObject: ["passcode": passcode, "device": device])) ?? Data()
+    /// The request body, as the page sends it. `speakerOff`: JARVIS replies in text only, from the session's first word.
+    public static func body(passcode: String, device: String, speakerOff: Bool = false) -> Data {
+        let fields = ["passcode": passcode, "device": device, "speaker": speakerOff ? "off" : "on"]
+        return (try? JSONSerialization.data(withJSONObject: fields)) ?? Data()
     }
 
     public static func parse(status: Int, body: Data) -> Result<Grant, TokenError> {

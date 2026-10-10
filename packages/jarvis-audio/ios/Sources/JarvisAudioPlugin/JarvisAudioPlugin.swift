@@ -18,6 +18,8 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stop", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setMuted", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "toggleMute", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setSpeaker", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "restoreAfterCall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendText", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getMicMode", returnType: CAPPluginReturnPromise),
@@ -49,10 +51,11 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             return call.reject("JARVIS's address isn't set.", "NO_SERVER")
         }
         let device = call.getString("device").flatMap { $0.isEmpty ? nil : $0 } ?? "iphone"
-        let muted = call.getBool("muted") ?? false
+        let muted = call.getBool("muted") ?? false, speakerOff = call.getBool("speakerOff") ?? false
         Task { @MainActor in
             do {
-                call.resolve(try await VoiceSession.shared.start(server: server, passcode: passcode, device: device, muted: muted))
+                call.resolve(try await VoiceSession.shared.start(server: server, passcode: passcode, device: device, muted: muted,
+                                                                 speakerOff: speakerOff))
                 PushNotifications.shared.register(server: server, passcode: passcode, device: device)
             } catch let f as VoiceSession.Failure {
                 call.reject(f.message, f.code)
@@ -71,20 +74,36 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func setMuted(_ call: CAPPluginCall) {
         guard let m = call.getBool("muted") else { return call.reject("Say muted: true or false.") }
-        mute(call) { try await VoiceSession.shared.setMuted(m, source: "user") }
+        reply(call, "muted") { try await VoiceSession.shared.setMuted(m, source: "user") }
     }
 
     @objc func toggleMute(_ call: CAPPluginCall) {
-        mute(call) { try await VoiceSession.shared.setMuted(!VoiceSession.shared.muted, source: "user") }
+        reply(call, "muted") { try await VoiceSession.shared.setMuted(!VoiceSession.shared.muted, source: "user") }
     }
 
-    private func mute(_ call: CAPPluginCall, _ change: @escaping @MainActor () async throws -> Bool) {
+    /// Resolves with `[key: change()]`, the new state, or rejects with the session's failure.
+    private func reply(_ call: CAPPluginCall, _ key: String, _ change: @escaping @MainActor () async throws -> Bool) {
         Task { @MainActor in
-            do { call.resolve(["muted": try await change()]) } catch let f as VoiceSession.Failure {
+            do { call.resolve([key: try await change()]) } catch let f as VoiceSession.Failure {
                 call.reject(f.message, f.code)
             } catch {
                 call.reject(error.localizedDescription)
             }
+        }
+    }
+
+    /// Speaker off: JARVIS replies in text only, with no speech made at all.
+    @objc func setSpeaker(_ call: CAPPluginCall) {
+        guard let off = call.getBool("off") else { return call.reject("Say off: true or false.") }
+        reply(call, "off") { try VoiceSession.shared.setSpeaker(off: off, source: "user") }
+    }
+
+    /// The answer to the offer after a phone call: `restore` puts the mic and speaker back as they were before it.
+    @objc func restoreAfterCall(_ call: CAPPluginCall) {
+        let restore = call.getBool("restore") ?? false
+        Task { @MainActor in
+            await VoiceSession.shared.restoreAfterCall(restore)
+            call.resolve()
         }
     }
 

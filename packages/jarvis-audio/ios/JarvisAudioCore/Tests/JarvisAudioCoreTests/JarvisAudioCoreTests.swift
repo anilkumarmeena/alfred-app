@@ -129,7 +129,42 @@ final class TokenReplyTests: XCTestCase {
 
     func testBodyMatchesThePage() throws {
         let json = try JSONSerialization.jsonObject(with: TokenReply.body(passcode: "123456", device: "iphone")) as? [String: String]
-        XCTAssertEqual(json, ["passcode": "123456", "device": "iphone"])
+        XCTAssertEqual(json, ["passcode": "123456", "device": "iphone", "speaker": "on"])
+        let off = try JSONSerialization.jsonObject(with: TokenReply.body(passcode: "1", device: "iphone", speakerOff: true)) as? [String: String]
+        XCTAssertEqual(off?["speaker"], "off")
+    }
+}
+
+final class CallQuietTests: XCTestCase {
+    let open = CallQuiet.State(muted: false, speakerOff: false)
+    let quiet = CallQuiet.State(muted: true, speakerOff: true)  // what a call sets
+
+    func testACallOffersBackWhatWasOn() {
+        var q = CallQuiet()
+        XCTAssertTrue(q.began(open))
+        XCTAssertFalse(q.began(quiet))  // a second call during the first
+        XCTAssertNil(q.offer)
+        XCTAssertEqual(q.ended(quiet), open)
+        XCTAssertEqual(q.offer, open)
+        XCTAssertEqual(q.settle(), open)
+        XCTAssertNil(q.offer)
+        XCTAssertNil(q.settle())
+    }
+
+    func testNothingToOfferWhenItWasQuietAlready() {
+        var q = CallQuiet()
+        XCTAssertTrue(q.began(quiet))
+        XCTAssertNil(q.ended(quiet))
+        XCTAssertNil(q.ended(quiet))  // no call on
+    }
+
+    func testOnlyWhatChangedSinceCounts() {
+        var q = CallQuiet()
+        _ = q.began(CallQuiet.State(muted: true, speakerOff: false))  // muted already: only the speaker to put back
+        XCTAssertEqual(q.ended(quiet), CallQuiet.State(muted: true, speakerOff: false))
+        _ = q.began(open)  // another call before the offer was answered closes it
+        XCTAssertNil(q.offer)
+        XCTAssertNil(q.ended(open))  // the user turned both back on during the call
     }
 }
 

@@ -29,6 +29,7 @@ final class VoiceSession: NSObject {
     private static let transcription = "lk.transcription", chat = "lk.chat"
     private nonisolated static let agentStateKey = "lk.agent.state"  // read in the RoomDelegate callbacks too
     private static let segmentKey = "lk.segment_id"
+    private static let speakerKey = "jarvis.speaker"  // our attribute: "off" and the agent makes no speech at all
 
     /// Every event for the page: a name from definitions.ts and its data.
     var onEvent: ((String, [String: Any]) -> Void)?
@@ -52,11 +53,16 @@ final class VoiceSession: NSObject {
     private let routing = AudioRouting()
     private let airpods = AirPodsMute()
     private let chime = ChimePlayer()
+    private let calls = CallWatch()
+    private var callQuiet = CallQuiet()  // a call turns the mic and speaker off, and offers them back after
     let micMode = MicMode()
 
     private(set) var connection = "disconnected"
     private(set) var agentState: String?
     private(set) var muted = false
+    /// Speaker off: JARVIS replies only in the transcript. The agent makes no speech (told in the token, then by our
+    /// participant attribute), and its track plays at volume 0, so a reply already being spoken stops at once.
+    private(set) var speakerOff = false
     private(set) var interrupted = false  // a call, Siri or an alarm has the audio for now
     private(set) var startedAt: Date?
     var active: Bool { wanted != nil }
@@ -72,12 +78,14 @@ final class VoiceSession: NSObject {
         routing.onEvent = { [weak self] in self?.audioEvent($0) }
         airpods.onPress = { [weak self] in self?.airpodsPressed($0) }
         micMode.onChange = { [weak self] in self?.emit("micMode", $0.state) }
+        calls.onChange = { [weak self] in self?.callChanged($0) }
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(appActive), name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
     func status() -> [String: Any] {
-        var s: [String: Any] = ["connection": connection, "muted": muted, "interrupted": interrupted]
+        var s: [String: Any] = ["connection": connection, "muted": muted, "speakerOff": speakerOff, "interrupted": interrupted]
+        if let offer = callQuiet.offer { s["afterCall"] = Self.fields(offer) }
         if let agentState { s["agent"] = agentState }
         if let startedAt { s["startedAt"] = Int(startedAt.timeIntervalSince1970 * 1000) }
         if wanted != nil { s["route"] = routing.route.output }
@@ -90,7 +98,7 @@ final class VoiceSession: NSObject {
     // MARK: - Starting and ending
 
     /// Joins, or re-reports a session that's already running with the same settings (the page reloaded).
-    func start(server: ServerAddress, passcode: String, device: String, muted startMuted: Bool) async throws -> [String: Any] {
+    func start(server: ServerAddress, passcode: String, device: String, muted startMuted: Bool, speakerOff startSilent: Bool) async throws -> [String: Any] {
         let w = Wanted(server: server, passcode: passcode, device: device)
         if wanted == w, connection != "disconnected" { return status() }
         if wanted != nil { end(reason: "hangup", message: nil, quiet: true) }
@@ -105,6 +113,7 @@ final class VoiceSession: NSObject {
         generation += 1
         let gen = generation
         muted = startMuted
+        speakerOff = startSilent
         sync = MicSync()
         micMode.sessionStarted()
         // With iOS's mute matching ours before the engine opens the mic. (micOn opts the recording session in to
@@ -135,6 +144,7 @@ final class VoiceSession: NSObject {
         if let r = room { drop(r) }  // the levels loop stops by itself once there's no room
         path?.cancel(); path = nil
         connection = "disconnected"; agentState = nil; muted = false; interrupted = false; startedAt = nil
+        callQuiet = CallQuiet()
         attempt = 0; outbox.removeAll()
         airpods.setSystemMuted(false)  // stored across sessions otherwise
         summaryChanged()
@@ -196,13 +206,14 @@ final class VoiceSession: NSObject {
         setConnection("connected", reason: nil)
         startLevels()
         await applyMic()  // a mute while it joined
+        await tellSpeaker(r)  // and the speaker
     }
 
     private func fetchToken(_ w: Wanted) async throws -> Grant {
         var req = URLRequest(url: w.server.tokenURL, timeoutInterval: 15)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = TokenReply.body(passcode: w.passcode, device: w.device)
+        req.httpBody = TokenReply.body(passcode: w.passcode, device: w.device, speakerOff: speakerOff)
         let data: Data, status: Int
         do {
             let (d, response) = try await URLSession.shared.data(for: req)
@@ -337,8 +348,12 @@ final class VoiceSession: NSObject {
         emit("transcript", ["id": l.id, "speaker": l.speaker, "text": l.text, "final": l.final])
     }
 
-    func sendText(_ text: String) throws {
+    private func requireSession() throws {
         guard wanted != nil else { throw Failure(code: "NOT_CONNECTED", message: "No session is running.") }
+    }
+
+    func sendText(_ text: String) throws {
+        try requireSession()
         outbox.append(text)
         flush()
     }
@@ -357,7 +372,8 @@ final class VoiceSession: NSObject {
 
     @discardableResult
     func setMuted(_ m: Bool, source: String) async throws -> Bool {
-        guard wanted != nil else { throw Failure(code: "NOT_CONNECTED", message: "No session is running.") }
+        try requireSession()
+        if source != "call" { callQuiet.settle() }  // the user chose: no offer to put it back after a call
         muted = m
         sync.changed(at: Self.now)
         // iOS is told about every change, taps on the screen included, so it agrees with the app and the next stem
@@ -393,8 +409,70 @@ final class VoiceSession: NSObject {
     /// it's that way already: a tap on Apple Watch arrives twice.
     func setMutedOffPage(_ m: Bool) async {
         guard wanted != nil, m != muted, (try? await setMuted(m, source: "user")) != nil else { return }
-        chime.play(muted: m)
+        if !speakerOff { chime.play(muted: m) }  // speaker off: not a sound
     }
+
+    // MARK: - The speaker
+
+    @discardableResult
+    func setSpeaker(off: Bool, source: String) throws -> Bool {
+        try requireSession()
+        if source != "call" { callQuiet.settle() }
+        speakerOff = off
+        playAgent()
+        if let r = room, connection == "connected" { Task { await tellSpeaker(r) } }  // else join tells it
+        emit("speaker", ["off": off, "source": source])
+        return off
+    }
+
+    /// Tells the agent the speaker switch through our participant attribute, if it doesn't have it already.
+    private func tellSpeaker(_ r: Room) async {
+        let want = speakerOff ? "off" : "on"
+        guard room === r, r.localParticipant.attributes[Self.speakerKey] != want else { return }
+        do { try await r.localParticipant.set(attributes: [Self.speakerKey: want]) } catch {
+            return NSLog("JarvisAudio: speaker \(want): \(error)")
+        }
+        if speakerOff != (want == "off") { await tellSpeaker(r) }  // switched again meanwhile: catch up
+    }
+
+    /// The agent's voice at full volume, or silent with the speaker off.
+    private func playAgent() {
+        guard let r = room else { return }
+        for p in r.remoteParticipants.values {
+            for t in p.audioTracks { (t.track as? RemoteAudioTrack)?.volume = speakerOff ? 0 : 1 }
+        }
+    }
+
+    // MARK: - Phone calls
+
+    /// A call came in (or went out): the mic and the speaker go off, so JARVIS neither hears the call nor speaks over
+    /// it. When the last one ends, the page offers them back as they were (CallQuiet).
+    private func callChanged(_ onCall: Bool) {
+        guard wanted != nil else { return }
+        if onCall {
+            guard callQuiet.began(current) else { return }
+            NSLog("JarvisAudio: a call: muting the mic and turning the speaker off")
+            emit("call", ["state": "began"])
+            if !speakerOff { _ = try? setSpeaker(off: true, source: "call") }
+            if !muted { Task { try? await setMuted(true, source: "call") } }
+        } else {
+            Task {  // after the mute above, for a call that ended as soon as it rang
+                guard let offer = callQuiet.ended(current) else { return }
+                emit("call", ["state": "ended", "restore": Self.fields(offer)])
+            }
+        }
+    }
+
+    /// The page's answer to the offer after a call: put the mic and speaker back as they were, or leave them off.
+    func restoreAfterCall(_ restore: Bool) async {
+        guard let was = callQuiet.settle(), restore else { return }
+        if was.speakerOff != speakerOff { _ = try? setSpeaker(off: was.speakerOff, source: "user") }
+        if was.muted != muted { _ = try? await setMuted(was.muted, source: "user") }
+    }
+
+    private var current: CallQuiet.State { CallQuiet.State(muted: muted, speakerOff: speakerOff) }
+
+    private static func fields(_ s: CallQuiet.State) -> [String: Any] { ["muted": s.muted, "speakerOff": s.speakerOff] }
 
     private static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
@@ -541,6 +619,7 @@ extension VoiceSession: RoomDelegate {
             guard self.room === room else { return }
             self.setConnection("connected", reason: nil)
             await self.applyMic()  // a mute while it was reconnecting
+            await self.tellSpeaker(room)  // and the speaker
         }
     }
 
@@ -562,6 +641,11 @@ extension VoiceSession: RoomDelegate {
         guard participant.kind == .agent else { return }
         let state = participant.attributes[Self.agentStateKey]
         Task { @MainActor in if self.room === room { self.agentChanged(state) } }
+    }
+
+    nonisolated func room(_ room: Room, participant: RemoteParticipant, didSubscribeTrack publication: RemoteTrackPublication) {
+        guard publication.kind == .audio else { return }
+        Task { @MainActor in if self.room === room { self.playAgent() } }  // silent from its first word with the speaker off
     }
 
     nonisolated func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) {

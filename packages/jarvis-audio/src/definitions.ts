@@ -29,8 +29,8 @@ export type EndReason =
   | "microphone";  // no mic permission, or the mic couldn't start
 
 /** Who changed the mute. "system": the mic couldn't start, or the room muted the mic track itself (the server, or
- * LiveKit after the mic failed), and the page should show it muted. */
-export type MuteSource = "user" | "earphone" | "system";
+ * LiveKit after the mic failed), and the page should show it muted. "call": iOS, a phone call came in. */
+export type MuteSource = "user" | "earphone" | "system" | "call";
 
 export interface StartOptions {
   /** The page's origin, e.g. https://mac.tailnet.ts.net. Defaults to the app's saved server URL. */
@@ -41,6 +41,14 @@ export interface StartOptions {
   device?: string;
   /** Join with the mic muted (the page does this when a typed message starts the session). */
   muted?: boolean;
+  /** iOS: join with the speaker off, so JARVIS replies only in text, greeting included (see `setSpeaker`). */
+  speakerOff?: boolean;
+}
+
+/** What the mic and speaker were when a phone call came in: the page offers to put them back once it's over. */
+export interface BeforeCall {
+  muted: boolean;
+  speakerOff: boolean;
 }
 
 export interface SessionStatus {
@@ -49,6 +57,11 @@ export interface SessionStatus {
   agent?: AgentState;
   /** The mic track follows this: muted means nothing is sent, even after a reconnect or a call. */
   muted: boolean;
+  /** iOS: the speaker is off, and JARVIS replies only in text. */
+  speakerOff?: boolean;
+  /** iOS: a phone call turned the mic and speaker off and has ended; this is what they were before it, until the
+   * page answers with `restoreAfterCall` or the user changes either. */
+  afterCall?: BeforeCall;
   /**
    * The mic is held by something else right now (a phone call, Siri): it comes back on its own. On iOS, where an
    * interruption's end isn't always reported, it's also cleared when iOS hands the audio back as the app comes on
@@ -100,6 +113,20 @@ export interface TranscriptEvent {
   final: boolean;
 }
 
+export interface SpeakerEvent {
+  off: boolean;
+  source: "user" | "call";
+}
+
+/**
+ * iOS: a phone call (or another app's CallKit call) began, which mutes the mic and turns the speaker off, or the
+ * last one ended. `restore` comes with "ended" when the mic or speaker was on before the call: offer it back.
+ */
+export interface CallEvent {
+  state: "began" | "ended";
+  restore?: BeforeCall;
+}
+
 export interface InterruptionEvent {
   state: "began" | "ended";
 }
@@ -145,6 +172,14 @@ export interface JarvisAudioPlugin {
    */
   setMuted(options: { muted: boolean }): Promise<{ muted: boolean }>;
   toggleMute(): Promise<{ muted: boolean }>;
+  /**
+   * iOS: speaker off for a meeting, a crowd or a call. JARVIS still hears the mic and typed messages, and replies only
+   * in text (the transcript events): the agent makes no speech at all, told by the `jarvis.speaker` participant
+   * attribute, and its track is played at volume 0 so a reply already under way stops at once. No chime either.
+   */
+  setSpeaker(options: { off: boolean }): Promise<{ off: boolean }>;
+  /** iOS: the answer to the offer after a call. `restore` puts the mic and speaker back as in `afterCall`. */
+  restoreAfterCall(options: { restore: boolean }): Promise<void>;
   /** Sends a typed message on lk.chat. Before the agent is listening it is queued, like the page does. */
   sendText(options: { text: string }): Promise<void>;
   getStatus(): Promise<SessionStatus>;
@@ -168,6 +203,10 @@ export interface JarvisAudioPlugin {
   addListener(event: "mute", fn: (e: MuteEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: "transcript", fn: (e: TranscriptEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: "interruption", fn: (e: InterruptionEvent) => void): Promise<PluginListenerHandle>;
+  /** iOS only: the speaker was switched, by the page or by a phone call. */
+  addListener(event: "speaker", fn: (e: SpeakerEvent) => void): Promise<PluginListenerHandle>;
+  /** iOS only: a phone call began or ended. */
+  addListener(event: "call", fn: (e: CallEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: "route", fn: (e: RouteEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: "quality", fn: (e: QualityEvent) => void): Promise<PluginListenerHandle>;
   addListener(event: "levels", fn: (e: LevelsEvent) => void): Promise<PluginListenerHandle>;
