@@ -63,9 +63,10 @@ export interface SessionStatus {
    * page answers with `restoreAfterCall` or the user changes either. */
   afterCall?: BeforeCall;
   /**
-   * The mic is held by something else right now (a phone call, Siri): it comes back on its own. On iOS, where an
-   * interruption's end isn't always reported, it's also cleared when iOS hands the audio back as the app comes on
-   * screen or the user unmutes, and when the server hears the mic. The page re-reads this when it's shown again.
+   * The mic is held by something else right now (a phone call, Siri): it comes back on its own. An interruption's end
+   * isn't always reported, so it's also cleared as the app comes on screen or the user unmutes: on iOS when iOS hands
+   * the audio back (or the server hears the mic), on Android when no phone call is ringing or going on. The page
+   * re-reads this when it's shown again.
    */
   interrupted: boolean;
   /** When the current session started, in ms since the epoch. */
@@ -152,8 +153,8 @@ export interface LevelsEvent {
 export interface JarvisAudioPermissionStatus {
   microphone: PermissionState;
   /**
-   * Android 13+: the ongoing-session notification. iOS: JARVIS's alerts (heartbeat, background tasks), which
-   * the app registers for through APNs when a session starts, asking the first time.
+   * JARVIS's alerts (heartbeat, background tasks), which the app registers for when a session starts (APNs on iOS,
+   * Firebase Cloud Messaging on Android), asking the first time. On Android 13+ also the session's own notification.
    */
   notifications: PermissionState;
 }
@@ -161,7 +162,8 @@ export interface JarvisAudioPermissionStatus {
 export interface JarvisAudioPlugin {
   /**
    * Connects to JARVIS and starts the mic. Resolves once connected; rejects with code UNAUTHORIZED, RATE_LIMITED,
-   * NO_MICROPHONE or SERVER. On iOS it then registers the app for JARVIS's notifications (/api/push/native).
+   * NO_MICROPHONE or SERVER. It then registers the app for JARVIS's notifications (/api/push/native): APNs on iOS,
+   * FCM on Android (in a build with a google-services.json).
    */
   start(options: StartOptions): Promise<SessionStatus>;
   /** Ends the session and stops the mic. */
@@ -183,9 +185,9 @@ export interface JarvisAudioPlugin {
   /** Sends a typed message on lk.chat. Before the agent is listening it is queued, like the page does. */
   sendText(options: { text: string }): Promise<void>;
   getStatus(): Promise<SessionStatus>;
-  /** iOS only: the current Mic Mode. */
+  /** iOS only: the current Mic Mode. Android rejects it as unavailable (it has no Mic Mode an app can read). */
   getMicMode(): Promise<MicModeEvent>;
-  /** iOS only: opens Apple's Mic Mode picker (Standard, Voice Isolation, Wide Spectrum). */
+  /** iOS only: opens Apple's Mic Mode picker (Standard, Voice Isolation, Wide Spectrum). Android rejects it. */
   showMicModes(): Promise<void>;
 
   /** The saved server URL, and whether it's the build-time default. */

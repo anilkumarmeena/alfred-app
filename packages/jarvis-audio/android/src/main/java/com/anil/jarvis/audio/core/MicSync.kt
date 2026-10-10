@@ -23,7 +23,19 @@ class MicSync(val settleMs: Long = 2_000) {
         settled(nowMs) && !target(muted, interrupted)
 
     companion object {
+        // AudioManager's modes while a phone call has the audio: RINGTONE, IN_CALL, CALL_SCREENING, CALL_REDIRECT
+        // and COMMUNICATION_REDIRECT (the plain numbers, so this runs in JVM tests).
+        private val CALL_MODES = setOf(1, 2, 4, 5, 6)
+
         /** Whether the mic track should be on: only while the user isn't muted and no call has the audio focus. */
         fun target(muted: Boolean, interrupted: Boolean): Boolean = !muted && !interrupted
+
+        /**
+         * Whether a phone call still holds the audio, from AudioManager.getMode(). Android doesn't promise the focus
+         * back after every transient loss (another app can keep it), and one that never comes would leave the page
+         * saying "Mic paused" for good: so when the user unmutes or the app comes on screen and no call is ringing
+         * or going on, the interruption is over. JARVIS's own session is MODE_IN_COMMUNICATION, which doesn't count.
+         */
+        fun callHoldsAudio(mode: Int): Boolean = mode in CALL_MODES
     }
 }

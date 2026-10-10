@@ -10,7 +10,10 @@ in a native plugin, JarvisAudio, and not in the web view, so:
 - the earphone button mutes and unmutes: the AirPods stem press on iOS 17+; on Android also a wired or
   Bluetooth headset's play/pause, and the notification's controls,
 - on iPhone, a Live Activity on the lock screen, in the Dynamic Island and on Apple Watch shows what JARVIS is
-  doing, with Mute/Unmute and Hang Up buttons,
+  doing, with Mute/Unmute and Hang Up buttons; on Android, an ongoing-call notification does the same (a Live
+  Update on Android 16),
+- JARVIS's alerts (heartbeat, background tasks) arrive with the app closed: APNs on iPhone, Firebase Cloud
+  Messaging on Android,
 - phone calls, Siri, AirPods going in and out, and network drops are handled: the session comes back on its own.
 
 ## How it works
@@ -132,16 +135,52 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
 
 ### Android (Kotlin, `packages/jarvis-audio/android`)
 
-- `VoiceService` is a foreground service of type `microphone`, with an ongoing notification (Listening,
-  Muted, Reconnecting…, with Mute and End). It runs for as long as the session is wanted, so the mic works
-  with the screen off. Swiping the app away ends the session.
-- LiveKit's `AudioSwitchHandler` sets communication mode, takes audio focus and routes to a Bluetooth
-  headset, wired headset or the speaker, in that order. A transient loss of focus (a phone call) pauses the
-  mic until it comes back.
-- The service's `MediaSession` takes headset presses (the wired hook, Bluetooth play/pause) and the lock screen
-  controls, and toggles the mute with the chime.
-- Reconnects work as on iOS, with `ConnectivityManager` for network changes.
-- Long-press the app icon → Change server.
+The same features as iOS, with Android's own pieces:
+
+| iOS | Android |
+|---|---|
+| `UIBackgroundModes` audio | `VoiceService`, a foreground service of type `microphone` |
+| Live Activity (lock screen, Dynamic Island, Watch) | the session's **call-style notification**, a Live Update on Android 16 |
+| AirPods stem press | headset buttons through a `MediaSession` |
+| APNs push | Firebase Cloud Messaging push |
+| Settings → JARVIS | long-press the app icon → **Change server** |
+| Mic Modes (Voice Isolation) | none: Android has no Mic Mode an app can read or offer |
+
+- **Keeping the mic alive.** `VoiceService` is a foreground service of type `microphone`. It runs for as long as
+  the session is wanted, so the mic works with the screen off. Swiping the app away ends the session, and the
+  notification goes with it. After a crash, the notification goes with the process.
+- **Audio.** LiveKit's `AudioSwitchHandler` sets communication mode, takes audio focus and routes to a Bluetooth
+  headset, a wired headset or the speaker, in that order. The voice input uses the phone's own echo cancellation
+  and noise suppression.
+- **The session notification** (`VoiceService.kt`) is Android's Live Activity. It shows **JARVIS**, what it's
+  doing (Listening, Muted, Speaking, Thinking, Connecting…, Mic paused for a call; `SessionSummary` in the core,
+  the same rules as iOS), the session's running time, and **Mute/Unmute** and **Hang Up**. Tapping elsewhere
+  opens the app.
+  - On Android 12+ it's a `CallStyle` notification (JARVIS is a call the user left running), so the lock screen
+    and status bar show it as an ongoing call.
+  - On Android 16 it asks to be promoted to a **Live Update** (`POST_PROMOTED_NOTIFICATIONS`): it sits at the top
+    of the lock screen and shows as a chip in the status bar.
+  - As on iOS, Mute asks for a state, not a toggle, and plays the falling or rising chime.
+  - There's no media card (no `MediaStyle`), for the same reason iOS has no Now Playing.
+  - Wear OS doesn't mirror ongoing notifications, so unlike the iOS Live Activity it doesn't appear on a watch.
+- **Headset buttons.** The service's `MediaSession` takes headset presses (the wired hook, Bluetooth
+  play/pause) and toggles the mute with the chime.
+- **Interruptions.** A transient loss of audio focus (a phone call) pauses the mic until focus comes back. Android
+  doesn't promise to give focus back every time. So "Mic paused" is also cleared when the app comes on screen, or
+  the user taps to unmute, if no phone call is ringing or going on (`AudioManager.getMode()`, `MicSync` in the
+  core).
+- **The mic track follows the mute** (`MicSync`), and **reconnects** work as on iOS, with `ConnectivityManager`
+  for network changes.
+- **Notifications** (`PushNotifications.kt`, `JarvisMessagingService.kt`): heartbeat alerts and background tasks
+  that finish, fail or have a question come through FCM, so they show with the app closed.
+  - When a session starts, the app gets its FCM token and posts it to `/api/push/native` with the passcode,
+    `"service": "fcm"` and its package name. It asks for notification permission the first time, with the mic.
+  - The Mac sends data messages, which the app shows itself in an **Alerts** channel. A newer push with the same
+    tag replaces the older one.
+  - Tapping a notification opens its page, e.g. `/?task=3`, on the saved server only.
+  - Needs a Firebase project: `android/app/google-services.json` in the app (git-ignored), and that project's
+    service account on the Mac. See [Android notifications](#android-notifications-firebase). An app built
+    without the file works the same, just with no alerts, and logs that once.
 
 ### Layout
 
@@ -164,8 +203,9 @@ capability) and `AppDelegate.swift` setting up `PushNotifications` and passing o
 JitPack in the repositories (LiveKit's audioswitch fork), `network_security_config.xml` allowing cleartext
 only for `localhost`, `127.0.0.1` and `10.0.2.2`, the Change server shortcut, and `MainActivity`. The
 plugin's manifest adds `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS`, `FOREGROUND_SERVICE`,
-`FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS`, `BLUETOOTH_CONNECT`, `ACCESS_NETWORK_STATE` and the
-service.
+`FOREGROUND_SERVICE_MICROPHONE`, `POST_NOTIFICATIONS`, `POST_PROMOTED_NOTIFICATIONS`, `BLUETOOTH_CONNECT`,
+`ACCESS_NETWORK_STATE`, the voice service and the Firebase messaging service. The app's `build.gradle` applies
+the Google services plugin only when `google-services.json` is there.
 
 ## Changes needed on the JARVIS side
 
@@ -176,12 +216,15 @@ service.
 2. **Server, for the voice session: none.** The app uses the existing `/api/token`, the existing passcode and
    the existing Tailscale Serve setup (`make tailscale-serve`). `logs/web.log` will show the phone as device
    `iphone` or `android`.
-3. **Server, for notifications (iPhone):** app web views have no Web Push, so the jarvis server's pushes,
-   which were Web Push only, never reached the app. The app now registers with APNs itself and posts its token
-   to `/api/push/native`; the jarvis side of that is `server-hook/jarvis-native-push.patch`, plus an APNs auth
-   key from the Apple Developer account. See [server-hook/README.md](server-hook/README.md). Until it's
-   applied the app's token is refused with a 404 (logged in Xcode's console) and nothing else changes. Android
-   still has no push: that needs FCM (a Firebase project and `google-services.json`) on both sides.
+3. **Server, for notifications:** app web views have no Web Push, so the jarvis server's pushes, which were
+   Web Push only, never reached the app. The app registers its own token and posts it to `/api/push/native`.
+   - **iPhone (APNs):** the jarvis side is `server-hook/jarvis-native-push.patch`, plus an APNs auth key from the
+     Apple Developer account. See [server-hook/README.md](server-hook/README.md). Until it's applied the app's
+     token is refused with a 404 (logged in Xcode's console), and nothing else changes.
+   - **Android (FCM):** the jarvis side is in the jarvis repo itself (`jarvis/notify/fcm.py`, commit `fcc5f99`),
+     plus a Firebase service account. See [Android notifications](#android-notifications-firebase). Against a
+     jarvis without it, the token is refused with a 400 (in `adb logcat -s JarvisAudio`), and nothing else
+     changes.
 4. **Settings → Preferences:** `web-hook/jarvis-preferences.patch` puts do not disturb, the voice settings
    (with Voice Isolation) and the background-work settings on one Preferences page, and adds the small
    `hold_status` panel action it reads do not disturb with. See [web-hook/README.md](web-hook/README.md#settings--preferences).
@@ -228,7 +271,7 @@ cd android
 | `npm test` | vitest: the page hook (`web-hook/native.ts`) against a fake plugin. |
 | `npm run typecheck` | TypeScript for the config, the shell page, the hook and the plugin API. |
 | `npm run test:ios` | `swift test` for JarvisAudioCore: server addresses, token replies, reconnect timing, captions, the chime, the Live Activity's status line. `npm run test:ios-direct` does the same with plain `swiftc` + `xctest`. |
-| `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle. `npm run test:android-direct` compiles it with Android Studio's bundled Kotlin compiler instead, without Gradle. |
+| `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle, plus the notification page links and the "is a call holding the audio" check. `npm run test:android-direct` compiles it with Android Studio's bundled Kotlin compiler instead, without Gradle. |
 | `npm run check:web-patch` | Applies `web-hook/jarvis-web.patch` to a copy of `../jarvis/web`, then typechecks it and runs its tests. |
 | `npm run check:preferences-patch` | Applies `web-hook/jarvis-preferences.patch` to a copy of the jarvis repo, then typechecks the web app and runs its tests and the panel's Python tests. |
 | `npm run check:mic-sync-patch` | Applies `web-hook/jarvis-mic-sync.patch` to a copy of `../jarvis/web`, checks its `bindNative` matches `web-hook/native.ts`, then typechecks it and runs its tests. |
@@ -282,6 +325,24 @@ next time the app opens (swipe it away first).
 3. Open JARVIS, enter the Mac's Tailscale address, then the passcode, and allow the microphone, notifications
    and Nearby devices (for Bluetooth headsets). The notification shows while a session is on.
 
+### Android notifications (Firebase)
+
+JARVIS's alerts reach Android through Firebase Cloud Messaging. Setting it up takes one Firebase project, used by
+both sides:
+
+| Step | Where | What |
+|---|---|---|
+| 1 | [console.firebase.google.com](https://console.firebase.google.com) | **Add project** (Analytics isn't needed), then **Add app → Android** with package `com.anil.jarvis` (or yours, if you changed `applicationId`). |
+| 2 | the app | Download **google-services.json** into `android/app/`, then rebuild and reinstall (`./gradlew assembleDebug`, `adb install -r …`). The file is git-ignored. |
+| 3 | the Mac | Firebase console → Project settings → **Service accounts** → **Generate new private key**. Save it as `secrets/fcm_service_account.json` in the jarvis repo, `chmod 600` it, then `make services-restart`. No env var is needed: the project id is read from the file. |
+| 4 | the phone | Start a session and allow notifications when asked. |
+
+To check it end to end: `logs/web.log` on the Mac shows `app push token saved for android (fcm)`, and the next
+finished background task or heartbeat alert shows on the phone with the app closed. Failures are in
+`logs/tasks.log` as `FCM push to android failed: …`, and on the phone in `adb logcat -s JarvisAudio`. The Mac
+keeps the tokens in `data/fcm_devices.json`, and drops one when FCM says it's no longer valid. The Mac side is
+documented in the jarvis repo's `docs/mobile.md` (Android push on the Mac).
+
 Some phones (Samsung, Xiaomi and others) kill background apps aggressively: if the session stops with the
 screen off, set JARVIS's battery use to Unrestricted in its app info.
 
@@ -292,15 +353,23 @@ better. Neither simulator has an earphone button to test.
 
 ## Status
 
-Written and checked here: the TypeScript (plugin API, shell page, hook) typechecks; 10 vitest tests pass;
-the Swift core's 21 XCTest tests and the Kotlin core's 19 JUnit tests pass (built with `swiftc` and Android
-Studio's Kotlin compiler); `jarvis-web.patch` applies to the current `web/`, which then typechecks and passes
-its own 35 tests.
+| Piece | State |
+|---|---|
+| TypeScript (plugin API, shell page, hook) | typechecks; 13 vitest tests pass |
+| Swift core | 21 XCTest tests pass (`swiftc`) |
+| Kotlin core | **29 JUnit tests pass** through Gradle |
+| Android app, Kotlin plugin, service and activity | **compile**: `./gradlew assembleDebug` builds `app-debug.apk` with no Kotlin warnings |
+| Android on a phone | **not run yet**: the emulator can't start in the sandbox this was built in, and no phone was attached |
+| FCM end to end | not tried: needs your Firebase project (`google-services.json` and the Mac's service account) |
 
-Not verified yet: the Swift plugin and the Kotlin plugin, service and activity haven't been compiled, because
-the sandbox they were written in couldn't download LiveKit's and Capacitor's binaries (GitHub release assets)
-or reach Maven, Google or Gradle's servers. Nothing has run on a phone. Expect a round of small compile fixes on
-the first `npm run build:ios-sim` and `./gradlew assembleDebug`. Things to check on a phone: that the AirPods
-gesture and wired button arrive during a session on iOS; that headset buttons reach the media session on
-Android while it's in communication mode; and that a session survives the screen being locked for a few
-minutes, a phone call, and Wi-Fi being turned off and on.
+Things to check on a phone:
+
+- **Both:** a session survives the screen being locked for a few minutes, a phone call, and Wi-Fi being turned
+  off and on.
+- **iOS:** the AirPods gesture and the wired button arrive during a session.
+- **Android:**
+  - headset buttons reach the media session while it's in communication mode;
+  - the call-style notification shows the timer, Mute/Unmute (with the chime) and Hang Up;
+  - on Android 16, the status bar chip shows;
+  - "Mic paused" clears after a call;
+  - a tapped alert opens its task.

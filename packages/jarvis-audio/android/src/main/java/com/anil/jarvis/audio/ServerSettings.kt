@@ -32,6 +32,10 @@ object ServerSettings {
     @JvmStatic
     fun current(ctx: Context): ServerAddress? = saved(ctx) ?: fromBuild(ctx)
 
+    /** The first-run page is up (or will be on the next load), whatever is saved. */
+    @JvmStatic
+    fun showingSetup(ctx: Context): Boolean = prefs(ctx).getBoolean(KEY_SETUP, false)
+
     @JvmStatic
     fun save(ctx: Context, address: ServerAddress) {
         prefs(ctx).edit().putString(KEY_URL, address.origin).putBoolean(KEY_SETUP, false).apply()

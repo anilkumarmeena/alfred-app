@@ -1,6 +1,7 @@
 package com.anil.jarvis.audio
 
 import android.Manifest
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import com.anil.jarvis.audio.core.ServerAddress
@@ -21,8 +22,9 @@ import org.json.JSONObject
 
 /**
  * The page's handle on [VoiceSession], and the server address setting. Method and event names match
- * src/definitions.ts. Links to jarvis-app://retry and jarvis-app://setup (the bundled error page) are handled
- * here too, since that page has no Capacitor bridge on Android.
+ * src/definitions.ts. Starting a session also registers for JARVIS's notifications ([PushNotifications]), and a
+ * tapped notification opens its page here. Links to jarvis-app://retry and jarvis-app://setup (the bundled error
+ * page) are handled here too, since that page has no Capacitor bridge on Android.
  */
 @CapacitorPlugin(
     name = "JarvisAudio",
@@ -45,6 +47,14 @@ class JarvisAudioPlugin : Plugin() {
 
     override fun load() {
         VoiceSession.addListener(forward)
+        // After the bridge's first load, which runs once onCreate is done: a tap that launched the app wins.
+        PushNotifications.open = { url -> bridge.webView.post { bridge.webView.loadUrl(url) } }
+        PushNotifications.tapped(context, activity.intent)
+    }
+
+    override fun handleOnNewIntent(intent: Intent) {
+        super.handleOnNewIntent(intent)
+        PushNotifications.tapped(context, intent)
     }
 
     override fun handleOnResume() { VoiceSession.foreground = true }
@@ -52,6 +62,7 @@ class JarvisAudioPlugin : Plugin() {
 
     override fun handleOnDestroy() {
         VoiceSession.removeListener(forward)  // the session carries on; a new bridge picks it up with getStatus
+        PushNotifications.open = null
         scope.cancel()
     }
 
@@ -60,7 +71,9 @@ class JarvisAudioPlugin : Plugin() {
     @PluginMethod
     fun start(call: PluginCall) {
         if (call.getString("passcode").isNullOrEmpty()) return call.reject("Enter your passcode first.", "UNAUTHORIZED")
-        if (getPermissionState(MICROPHONE) != PermissionState.GRANTED) {
+        // The mic, and the first time also notifications (the session's own, and JARVIS's alerts), as iOS asks
+        // for notifications when the first session starts. A refusal of those doesn't stop the session.
+        if (getPermissionState(MICROPHONE) != PermissionState.GRANTED || runtimeAliases().any { getPermissionState(it) == PermissionState.PROMPT }) {
             return requestPermissionForAliases(runtimeAliases(), call, "startAfterPermission")
         }
         begin(call)
@@ -81,6 +94,7 @@ class JarvisAudioPlugin : Plugin() {
         scope.launch {
             try {
                 call.resolve(VoiceSession.start(context, server, passcode, device, muted))
+                PushNotifications.register(context, server, passcode, device)
             } catch (f: VoiceSession.Failure) {
                 call.reject(f.message, f.code)
             } catch (e: Exception) {
@@ -125,6 +139,16 @@ class JarvisAudioPlugin : Plugin() {
     fun getStatus(call: PluginCall) {
         scope.launch { call.resolve(VoiceSession.status()) }
     }
+
+    // --- Mic Mode: iOS only ---
+
+    // Android has no Mic Mode an app can read or offer (its voice-call input already uses the phone's own noise
+    // suppression and echo cancellation), so the page draws no Mic pill: getStatus() has no micMode.
+    @PluginMethod
+    fun getMicMode(call: PluginCall) { call.unavailable("Mic Modes are iOS only.") }
+
+    @PluginMethod
+    fun showMicModes(call: PluginCall) { call.unavailable("Mic Modes are iOS only.") }
 
     // --- The server address ---
 

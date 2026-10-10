@@ -27,3 +27,6 @@ local.properties
 .idea/
 *.iml
 xcuserdata/
+
+# Firebase config for Android push (per user: your own Firebase project)
+android/app/google-services.json

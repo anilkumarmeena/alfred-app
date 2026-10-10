@@ -31,6 +31,32 @@ class ServerAddressTest {
         assertNull(ServerAddress.parseOrNull(null))
     }
 
+    @Test fun pushUrl() {
+        assertEquals("https://mac.ts.net/api/push/native", ServerAddress.parse("mac.ts.net").pushUrl)
+    }
+
+    @Test fun notificationPagesStayOnTheServer() {
+        val s = ServerAddress.parse("mac.ts.net")
+        assertEquals("https://mac.ts.net/?task=3", s.page("/?task=3"))
+        assertEquals("https://mac.ts.net/?alert=calendar", s.page("/?alert=calendar"))
+        assertEquals("https://MAC.ts.net/?task=4", s.page("https://MAC.ts.net/?task=4"))
+        assertNull(s.page("https://evil.example.com/?task=3"))
+        assertNull(s.page("//evil.example.com/x"))
+        assertNull(s.page("http://mac.ts.net/?task=3"))
+        assertNull(s.page("https://mac.ts.net:8443/"))
+        assertNull(s.page("javascript:alert(1)"))
+        assertEquals("http://localhost:8787/?task=1", ServerAddress.parse("http://localhost:8787").page("/?task=1"))
+    }
+
+    @Test fun notificationPageCarriesItsTextLikeTheServiceWorker() {
+        val url = ServerAddress.parse("mac.ts.net").page("/?task=3", title = "Task 3 is done", body = "C++ & more: 100%")!!
+        val uri = java.net.URI(url)
+        assertEquals("task=3", uri.rawQuery)
+        val hash = uri.rawFragment.split("&").map { it.substringBefore("=") to java.net.URLDecoder.decode(it.substringAfter("="), "UTF-8") }
+        assertEquals(listOf("title" to "Task 3 is done", "body" to "C++ & more: 100%"), hash)
+        assertFalse(uri.rawFragment.contains("+"))
+    }
+
     @Test fun cleartext() {
         assertTrue(ServerAddress.parse("http://localhost:8787").isCleartext)
         assertFalse(ServerAddress.parse("mac.ts.net").isCleartext)
@@ -58,6 +84,47 @@ class TokenReplyTest {
         assertFalse(TokenError.RateLimited("x").isRetryable)
         assertTrue(TokenError.Server("x").isRetryable)
         assertTrue(TokenError.BadReply.isRetryable)
+    }
+}
+
+class PushRegistrationTest {
+    private fun fields(vararg pairs: Pair<String, String>): (String) -> String? = mapOf(*pairs)::get
+
+    @Test fun body() {
+        assertEquals(
+            mapOf("passcode" to "123456", "device" to "android", "token" to "abc:DEF_-1", "service" to "fcm", "topic" to "com.anil.jarvis"),
+            PushRegistration.fields("123456", "android", "abc:DEF_-1", "com.anil.jarvis"))
+    }
+
+    @Test fun replies() {
+        assertTrue(PushRegistration.parse(200, fields("ok" to "true")).isSuccess)
+        assertEquals(PushRegistration.Refusal.Unauthorized, PushRegistration.parse(401, fields("error" to "Wrong passcode.")).exceptionOrNull())
+        assertEquals(PushRegistration.Refusal.NotSupported, PushRegistration.parse(404, fields()).exceptionOrNull())
+        assertEquals(PushRegistration.Refusal.Off("Notifications are off on the Mac. Set JARVIS_PUSH=on"),
+            PushRegistration.parse(409, fields("error" to "Notifications are off on the Mac. Set JARVIS_PUSH=on")).exceptionOrNull())
+        assertEquals(PushRegistration.Refusal.Server("JARVIS didn't take the notification token (HTTP 500)."),
+            PushRegistration.parse(500, fields()).exceptionOrNull())
+    }
+}
+
+class SessionSummaryTest {
+    private fun summary(connection: String = "connected", agent: String? = "listening", muted: Boolean = false, interrupted: Boolean = false) =
+        SessionSummary.of(true, connection, agent, muted, interrupted)
+
+    @Test fun nothingWithoutASession() {
+        assertNull(SessionSummary.of(false, "disconnected", null, muted = false, interrupted = false))
+    }
+
+    @Test fun status() {
+        assertEquals("Listening", summary()?.status)
+        assertEquals("Listening", summary(agent = null)?.status)
+        assertEquals("Speaking", summary(agent = "speaking")?.status)
+        assertEquals("Thinking", summary(agent = "thinking")?.status)
+        assertEquals("Muted", summary(agent = "speaking", muted = true)?.status)
+        assertEquals("Mic paused for a call", summary(muted = true, interrupted = true)?.status)
+        assertEquals("Connecting…", summary("connecting", muted = true)?.status)
+        assertEquals(SessionSummary.Phase.RECONNECTING, summary("reconnecting")?.phase)
+        assertTrue(summary(muted = true)!!.muted)
     }
 }
 
@@ -126,6 +193,12 @@ class MicSyncTest {
         assertTrue(s.heardWhileOff(10_000, muted = true, interrupted = false))
         assertTrue(s.heardWhileOff(10_000, muted = false, interrupted = true))
         assertFalse(s.heardWhileOff(10_000, muted = false, interrupted = false))
+    }
+
+    @Test fun onlyAPhoneCallHoldsTheAudio() {
+        // AudioManager: NORMAL 0, RINGTONE 1, IN_CALL 2, IN_COMMUNICATION 3, CALL_SCREENING 4, CALL_REDIRECT 5,
+        // COMMUNICATION_REDIRECT 6
+        assertEquals(listOf(1, 2, 4, 5, 6), (0..6).filter { MicSync.callHoldsAudio(it) })
     }
 
     @Test fun reportsJustAfterAChangeAreAboutTheOldState() {

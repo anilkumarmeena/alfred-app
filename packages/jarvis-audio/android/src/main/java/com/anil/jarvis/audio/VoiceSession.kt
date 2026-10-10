@@ -16,6 +16,7 @@ import com.anil.jarvis.audio.core.Grant
 import com.anil.jarvis.audio.core.MicSync
 import com.anil.jarvis.audio.core.ReconnectPolicy
 import com.anil.jarvis.audio.core.ServerAddress
+import com.anil.jarvis.audio.core.SessionSummary
 import com.anil.jarvis.audio.core.TokenError
 import com.anil.jarvis.audio.core.TokenReply
 import com.getcapacitor.JSObject
@@ -40,11 +41,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
@@ -105,7 +102,10 @@ object VoiceSession {
 
     /** The app is on screen: only then are voice levels worth sending. Set by the plugin. */
     var foreground = true
-        set(value) { field = value; if (value) startLevels() }
+        set(value) {
+            field = value
+            if (value) { takeAudioBack("app active"); startLevels() }
+        }
 
     fun addListener(l: Listener) { listeners.add(l) }
     fun removeListener(l: Listener) { listeners.remove(l) }
@@ -214,24 +214,13 @@ object VoiceSession {
         applyMic()  // a mute or a call while it joined
     }
 
-    private suspend fun fetchToken(w: Wanted): Grant = withContext(Dispatchers.IO) {
-        val (status, body) = try {
-            val c = URL(w.server.tokenUrl).openConnection() as HttpURLConnection
-            c.requestMethod = "POST"
-            c.connectTimeout = 10_000; c.readTimeout = 15_000
-            c.doOutput = true
-            c.setRequestProperty("Content-Type", "application/json")
-            val body = JSONObject().put("passcode", w.passcode).put("device", w.device).toString()
-            c.outputStream.use { it.write(body.toByteArray()) }
-            val code = c.responseCode
-            val text = (if (code in 200..299) c.inputStream else c.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
-            c.disconnect()
-            code to text
+    private suspend fun fetchToken(w: Wanted): Grant {
+        val (status, json) = try {
+            Http.post(w.server.tokenUrl, mapOf("passcode" to w.passcode, "device" to w.device))
         } catch (e: IOException) {
             throw Failure("SERVER", "Couldn't reach JARVIS at ${w.server.host}.", retryable = true)
         }
-        val json = try { JSONObject(body) } catch (e: Exception) { null }
-        TokenReply.parse(status) { key -> json?.optString(key)?.takeIf { json.has(key) } }.getOrElse { e ->
+        return TokenReply.parse(status) { Http.field(json, it) }.getOrElse { e ->
             val t = e as TokenError
             throw Failure(t.code, t.message, t.isRetryable)
         }
@@ -397,6 +386,8 @@ object VoiceSession {
         if (wanted == null) throw Failure("NOT_CONNECTED", "No session is running.")
         muted = m
         sync.changed(SystemClock.elapsedRealtime())
+        // Unmuting from the screen while "Mic paused": if no phone call holds the audio any more, that's over.
+        if (!m && interrupted && source == "user") takeAudioBack("unmuted")
         // The track follows now. With no room yet (reconnecting), join and Reconnected apply it; with a call
         // holding the mic it stays off until the call is over.
         val opened = applyMic()
@@ -449,12 +440,25 @@ object VoiceSession {
         }
     }
 
-    /** A headset button press, from [VoiceService]'s media session or its notification. */
-    fun earphonePress(source: String = "earphone") {
+    /** A headset button press, from [VoiceService]'s media session: a toggle, with the chime. */
+    fun earphonePress() {
         if (wanted == null || !presses.accept(SystemClock.elapsedRealtime())) return
         scope.launch {
-            val m = try { setMuted(!muted, source) } catch (f: Failure) { return@launch }
-            if (source == "earphone") ChimePlayer.play(m)
+            val m = try { setMuted(!muted, "earphone") } catch (f: Failure) { return@launch }
+            ChimePlayer.play(m)
+        }
+    }
+
+    /**
+     * A tap on the notification's Mute or Unmute (on the phone, or a watch it's mirrored to), with the chime as the
+     * only sign of it off the page. It asks for a state rather than a toggle, as the iOS Live Activity does, so a
+     * tap delivered twice can't undo itself: ignored when it's that way already.
+     */
+    fun setMutedOffPage(m: Boolean) {
+        if (wanted == null || m == muted) return
+        scope.launch {
+            try { setMuted(m, "user") } catch (f: Failure) { return@launch }
+            ChimePlayer.play(m)
         }
     }
 
@@ -465,6 +469,19 @@ object VoiceSession {
             AudioManager.AUDIOFOCUS_GAIN -> if (interrupted) interrupt(false)
             else -> Log.i(TAG, "audio focus $change")
         }
+    }
+
+    /**
+     * Android doesn't promise the audio focus back after every transient loss, and one that never comes would leave
+     * the page saying "Mic paused" for good. So when the app comes on screen, or the user unmutes, and no phone call
+     * is ringing or going on ([MicSync.callHoldsAudio]), the interruption is over and the mic comes back.
+     */
+    private fun takeAudioBack(why: String) {
+        if (!interrupted || wanted == null) return
+        val mode = app.getSystemService(AudioManager::class.java)?.mode ?: return
+        if (MicSync.callHoldsAudio(mode)) return
+        Log.i(TAG, "interruption over ($why, audio mode $mode)")
+        interrupt(false)
     }
 
     private fun interrupt(began: Boolean) {
@@ -507,15 +524,6 @@ object VoiceSession {
         else -> "unknown"
     }
 
-    /** For the notification: what the session is doing, in a word or two. */
-    fun summary(): String = when {
-        wanted == null -> "Not connected"
-        connection == "connecting" -> "Connecting…"
-        connection == "reconnecting" -> "Reconnecting…"
-        interrupted -> "Mic paused for a call"
-        muted -> "Muted"
-        agentState == "speaking" -> "Speaking"
-        agentState == "thinking" -> "Thinking"
-        else -> "Listening"
-    }
+    /** What the session is doing, for the notification, or null with no session. */
+    val summary: SessionSummary? get() = SessionSummary.of(wanted != null, connection, agentState, muted, interrupted)
 }

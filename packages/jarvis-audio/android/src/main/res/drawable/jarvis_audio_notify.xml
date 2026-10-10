@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- JARVIS's core, a ring around a dot: the icon of its alerts (heartbeat, background tasks). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,19.5c-4.14,0 -7.5,-3.36 -7.5,-7.5S7.86,4.5 12,4.5s7.5,3.36 7.5,7.5 -3.36,7.5 -7.5,7.5zM12,8a4,4 0,1 0,0 8,4 4,0 1,0 0,-8z" />
+</vector>

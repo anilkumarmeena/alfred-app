@@ -12,13 +12,31 @@
     <!-- The mic keeps running with the screen off or another app in front: a microphone foreground service. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <!-- Android 13+: the ongoing-session notification. -->
+    <!-- Android 13+: the ongoing-session notification, and JARVIS's alerts. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Android 16: the session's notification as a Live Update (top of the lock screen, a status bar chip). -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <application>
         <service
             android:name="com.anil.jarvis.audio.VoiceService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- JARVIS's alerts through Firebase Cloud Messaging (PushNotifications), with the app closed too. -->
+        <service
+            android:name="com.anil.jarvis.audio.JarvisMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- For notification messages Android shows itself (the Mac sends data messages, which the app shows). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="jarvis_alerts" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/jarvis_audio_notify" />
     </application>
 </manifest>
