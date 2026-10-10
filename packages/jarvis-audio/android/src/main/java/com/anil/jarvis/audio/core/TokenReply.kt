@@ -19,6 +19,11 @@ sealed class TokenError(val code: String, override val message: String) : Except
 
 /** The token reply. JSON is left to the caller (org.json on Android), so this runs in plain JVM tests. */
 object TokenReply {
+    /** The request body's fields, as the page sends them. [speakerOff]: JARVIS replies in text only, from its first word. */
+    @JvmStatic
+    fun fields(passcode: String, device: String, speakerOff: Boolean = false): Map<String, String> =
+        mapOf("passcode" to passcode, "device" to device, "speaker" to if (speakerOff) "off" else "on")
+
     /** [field] reads a string field of the reply's JSON object, or null if there's none (or no object). */
     @JvmStatic
     fun parse(status: Int, field: (String) -> String?): Result<Grant> {

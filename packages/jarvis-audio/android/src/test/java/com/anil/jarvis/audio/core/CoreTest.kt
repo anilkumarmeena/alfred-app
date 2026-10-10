@@ -79,6 +79,11 @@ class TokenReplyTest {
         assertEquals(TokenError.BadReply, TokenReply.parse(200, fields("token" to "")).exceptionOrNull())
     }
 
+    @Test fun bodyMatchesThePage() {
+        assertEquals(mapOf("passcode" to "123456", "device" to "android", "speaker" to "on"), TokenReply.fields("123456", "android"))
+        assertEquals("off", TokenReply.fields("1", "android", speakerOff = true)["speaker"])
+    }
+
     @Test fun onlyRefusalsStopRetries() {
         assertFalse(TokenError.Unauthorized.isRetryable)
         assertFalse(TokenError.RateLimited("x").isRetryable)
@@ -125,6 +130,39 @@ class SessionSummaryTest {
         assertEquals("Connecting…", summary("connecting", muted = true)?.status)
         assertEquals(SessionSummary.Phase.RECONNECTING, summary("reconnecting")?.phase)
         assertTrue(summary(muted = true)!!.muted)
+    }
+}
+
+class CallQuietTest {
+    private val open = CallQuiet.State(muted = false, speakerOff = false)
+    private val quiet = CallQuiet.State(muted = true, speakerOff = true)  // what a call sets
+
+    @Test fun aCallOffersBackWhatWasOn() {
+        val q = CallQuiet()
+        assertTrue(q.began(open))
+        assertFalse(q.began(quiet))  // reported again during the same call
+        assertNull(q.offer)
+        assertEquals(open, q.ended(quiet))
+        assertEquals(open, q.offer)
+        assertEquals(open, q.settle())
+        assertNull(q.offer)
+        assertNull(q.settle())
+    }
+
+    @Test fun nothingToOfferWhenItWasQuietAlready() {
+        val q = CallQuiet()
+        assertTrue(q.began(quiet))
+        assertNull(q.ended(quiet))
+        assertNull(q.ended(quiet))  // no call on
+    }
+
+    @Test fun onlyWhatChangedSinceCounts() {
+        val q = CallQuiet()
+        q.began(CallQuiet.State(muted = true, speakerOff = false))  // muted already: only the speaker to put back
+        assertEquals(CallQuiet.State(muted = true, speakerOff = false), q.ended(quiet))
+        q.began(open)  // another call before the offer was answered closes it
+        assertNull(q.offer)
+        assertNull(q.ended(open))  // the user turned both back on during the call
     }
 }
 

@@ -91,9 +91,10 @@ class JarvisAudioPlugin : Plugin() {
         val passcode = call.getString("passcode")!!
         val device = call.getString("device")?.takeIf { it.isNotBlank() } ?: "android"
         val muted = call.getBoolean("muted", false) ?: false
+        val speakerOff = call.getBoolean("speakerOff", false) ?: false
         scope.launch {
             try {
-                call.resolve(VoiceSession.start(context, server, passcode, device, muted))
+                call.resolve(VoiceSession.start(context, server, passcode, device, muted, speakerOff))
                 PushNotifications.register(context, server, passcode, device)
             } catch (f: VoiceSession.Failure) {
                 call.reject(f.message, f.code)
@@ -111,19 +112,34 @@ class JarvisAudioPlugin : Plugin() {
     @PluginMethod
     fun setMuted(call: PluginCall) {
         val m = call.getBoolean("muted") ?: return call.reject("Say muted: true or false.")
-        mute(call) { VoiceSession.setMuted(m, "user") }
+        reply(call, "muted") { VoiceSession.setMuted(m, "user") }
     }
 
     @PluginMethod
     fun toggleMute(call: PluginCall) {
-        mute(call) { VoiceSession.setMuted(!VoiceSession.muted, "user") }
+        reply(call, "muted") { VoiceSession.setMuted(!VoiceSession.muted, "user") }
     }
 
-    private fun mute(call: PluginCall, change: suspend () -> Boolean) {
+    /** Resolves with `{key: change()}`, the new state, or rejects with the session's failure. */
+    private fun reply(call: PluginCall, key: String, change: suspend () -> Boolean) {
         scope.launch {
-            try { call.resolve(JSObject().put("muted", change())) }
+            try { call.resolve(JSObject().put(key, change())) }
             catch (f: VoiceSession.Failure) { call.reject(f.message, f.code) }
         }
+    }
+
+    /** Speaker off: JARVIS replies in text only, with no speech made at all. */
+    @PluginMethod
+    fun setSpeaker(call: PluginCall) {
+        val off = call.getBoolean("off") ?: return call.reject("Say off: true or false.")
+        reply(call, "off") { VoiceSession.setSpeaker(off, "user") }
+    }
+
+    /** The answer to the offer after a phone call: `restore` puts the mic and speaker back as they were before it. */
+    @PluginMethod
+    fun restoreAfterCall(call: PluginCall) {
+        val restore = call.getBoolean("restore", false) ?: false
+        scope.launch { VoiceSession.restoreAfterCall(restore); call.resolve() }
     }
 
     @PluginMethod

@@ -9,6 +9,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.anil.jarvis.audio.core.AgentStates
+import com.anil.jarvis.audio.core.CallQuiet
 import com.anil.jarvis.audio.core.Captions
 import com.anil.jarvis.audio.core.DisconnectCause
 import com.anil.jarvis.audio.core.EarphoneDebouncer
@@ -33,6 +34,7 @@ import io.livekit.android.room.datastream.incoming.TextStreamReceiver
 import io.livekit.android.room.participant.ConnectionQuality
 import io.livekit.android.room.participant.LocalParticipant
 import io.livekit.android.room.participant.Participant
+import io.livekit.android.room.track.RemoteAudioTrack
 import io.livekit.android.room.track.Track
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +60,7 @@ object VoiceSession {
     private const val CHAT = "lk.chat"
     private const val AGENT_STATE = "lk.agent.state"
     private const val SEGMENT_ID = "lk.segment_id"
+    private const val SPEAKER = "jarvis.speaker"  // our attribute: "off" and the agent makes no speech at all
     private const val LEVELS_MS = 100L
 
     fun interface Listener { fun onEvent(name: String, data: JSObject) }
@@ -90,10 +93,17 @@ object VoiceSession {
     private val presses = EarphoneDebouncer()
     private var sync = MicSync()  // keeps the mic track and the mute / interruption the page shows in step
     private var switching = 0  // mic track switches in flight: the room's reports of them aren't news
+    private var calls: CallWatch? = null
+    private var callQuiet = CallQuiet()  // a call turns the mic and speaker off, and offers them back after
 
     var connection = "disconnected"; private set
     var agentState: String? = null; private set
     var muted = false; private set
+    /**
+     * Speaker off: JARVIS replies only in the transcript. The agent makes no speech (told in the token, then by our
+     * participant attribute), and its track plays at volume 0, so a reply already being spoken stops at once.
+     */
+    var speakerOff = false; private set
     var interrupted = false; private set  // a call or another app has the mic for now
     var startedAt: Long? = null; private set
     var route: String? = null; private set
@@ -116,6 +126,8 @@ object VoiceSession {
         put("connection", connection)
         agentState?.let { put("agent", it) }
         put("muted", muted)
+        put("speakerOff", speakerOff)
+        callQuiet.offer?.let { put("afterCall", fields(it)) }
         put("interrupted", interrupted)
         startedAt?.let { put("startedAt", it) }
         route?.let { put("route", it) }
@@ -124,7 +136,8 @@ object VoiceSession {
     // --- Starting and ending ---
 
     /** Joins, or re-reports a session that's already running with the same settings (the page reloaded). */
-    suspend fun start(context: Context, server: ServerAddress, passcode: String, device: String, startMuted: Boolean): JSObject {
+    suspend fun start(context: Context, server: ServerAddress, passcode: String, device: String, startMuted: Boolean,
+                      startSilent: Boolean = false): JSObject {
         app = context.applicationContext
         val w = Wanted(server, passcode, device)
         if (wanted == w && connection != "disconnected") return status()
@@ -132,7 +145,10 @@ object VoiceSession {
         wanted = w
         val gen = ++generation
         muted = startMuted
+        speakerOff = startSilent
         sync = MicSync()
+        callQuiet = CallQuiet()
+        calls = CallWatch(app) { callChanged(it) }.also { it.start() }  // a call already on quiets it from the start
         VoiceService.start(app)  // now, while the app is in the foreground, as Android 14 requires for the mic
         watchNetwork()
         try {
@@ -157,7 +173,9 @@ object VoiceSession {
         levelsJob?.cancel(); levelsJob = null
         room?.let { dropRoom(it) }
         unwatchNetwork()
-        connection = "disconnected"; agentState = null; muted = false; interrupted = false; startedAt = null
+        calls?.stop(); calls = null
+        callQuiet = CallQuiet()
+        connection = "disconnected"; agentState = null; muted = false; speakerOff = false; interrupted = false; startedAt = null
         attempt = 0; outbox.clear()
         presses.reset()
         if (::app.isInitialized) VoiceService.stop(app)
@@ -212,11 +230,12 @@ object VoiceSession {
         setConnection("connected", null)
         startLevels()
         applyMic()  // a mute or a call while it joined
+        tellSpeaker(r)  // and the speaker
     }
 
     private suspend fun fetchToken(w: Wanted): Grant {
         val (status, json) = try {
-            Http.post(w.server.tokenUrl, mapOf("passcode" to w.passcode, "device" to w.device))
+            Http.post(w.server.tokenUrl, TokenReply.fields(w.passcode, w.device, speakerOff))
         } catch (e: IOException) {
             throw Failure("SERVER", "Couldn't reach JARVIS at ${w.server.host}.", retryable = true)
         }
@@ -238,7 +257,9 @@ object VoiceSession {
             is RoomEvent.Reconnected -> {
                 setConnection("connected", null)
                 scope.launch { applyMic() }  // a mute or a call while it was reconnecting
+                tellSpeaker(r)  // and the speaker
             }
+            is RoomEvent.TrackSubscribed -> if (e.track is RemoteAudioTrack) playAgent()  // silent from its first word
             is RoomEvent.ActiveSpeakersChanged ->
                 if (e.speakers.any { it is LocalParticipant } && sync.heardWhileOff(SystemClock.elapsedRealtime(), muted, interrupted)) {
                     Log.i(TAG, "mic heard while off: switching it off again")
@@ -364,8 +385,12 @@ object VoiceSession {
         put("id", l.id); put("speaker", l.speaker); put("text", l.text); put("final", l.final)
     })
 
-    fun sendText(text: String) {
+    private fun requireSession() {
         if (wanted == null) throw Failure("NOT_CONNECTED", "No session is running.")
+    }
+
+    fun sendText(text: String) {
+        requireSession()
         outbox.addLast(text)
         flush()
     }
@@ -383,7 +408,8 @@ object VoiceSession {
     // --- The mic ---
 
     suspend fun setMuted(m: Boolean, source: String): Boolean {
-        if (wanted == null) throw Failure("NOT_CONNECTED", "No session is running.")
+        requireSession()
+        if (source != "call") callQuiet.settle()  // the user chose: no offer to put it back after a call
         muted = m
         sync.changed(SystemClock.elapsedRealtime())
         // Unmuting from the screen while "Mic paused": if no phone call holds the audio any more, that's over.
@@ -445,7 +471,7 @@ object VoiceSession {
         if (wanted == null || !presses.accept(SystemClock.elapsedRealtime())) return
         scope.launch {
             val m = try { setMuted(!muted, "earphone") } catch (f: Failure) { return@launch }
-            ChimePlayer.play(m)
+            if (!speakerOff) ChimePlayer.play(m)  // speaker off: not a sound
         }
     }
 
@@ -458,12 +484,72 @@ object VoiceSession {
         if (wanted == null || m == muted) return
         scope.launch {
             try { setMuted(m, "user") } catch (f: Failure) { return@launch }
-            ChimePlayer.play(m)
+            if (!speakerOff) ChimePlayer.play(m)  // speaker off: not a sound
         }
     }
 
+    // --- The speaker ---
+
+    fun setSpeaker(off: Boolean, source: String): Boolean {
+        requireSession()
+        if (source != "call") callQuiet.settle()
+        speakerOff = off
+        playAgent()
+        room?.let { if (connection == "connected") tellSpeaker(it) }  // else join tells it
+        emit("speaker", JSObject().put("off", off).put("source", source))
+        return off
+    }
+
+    /** Tells the agent the speaker switch through our participant attribute, if it doesn't have it already. */
+    private fun tellSpeaker(r: Room) {
+        val want = if (speakerOff) "off" else "on"
+        if (room !== r || r.localParticipant.attributes[SPEAKER] == want) return
+        try { r.localParticipant.updateAttributes(mapOf(SPEAKER to want)) } catch (e: Exception) { Log.w(TAG, "speaker $want", e) }
+    }
+
+    /** The agent's voice at full volume, or silent with the speaker off. */
+    private fun playAgent() {
+        val r = room ?: return
+        for (p in r.remoteParticipants.values) {
+            for ((_, track) in p.audioTrackPublications) (track as? RemoteAudioTrack)?.setVolume(if (speakerOff) 0.0 else 1.0)
+        }
+    }
+
+    // --- Phone calls ---
+
+    /**
+     * A call is ringing or on ([CallWatch]): the mic and the speaker go off, so JARVIS neither hears the call nor
+     * speaks over it. When it ends, the page offers them back as they were ([CallQuiet]).
+     */
+    private fun callChanged(onCall: Boolean) {
+        if (wanted == null) return
+        if (onCall) {
+            if (!callQuiet.began(current())) return
+            Log.i(TAG, "a call: muting the mic and turning the speaker off")
+            emit("call", JSObject().put("state", "began"))
+            if (!speakerOff) setSpeaker(true, "call")
+            if (!muted) scope.launch { try { setMuted(true, "call") } catch (_: Failure) {} }
+        } else {
+            val offer = callQuiet.ended(current()) ?: return
+            emit("call", JSObject().put("state", "ended").put("restore", fields(offer)))
+        }
+    }
+
+    /** The page's answer to the offer after a call: put the mic and speaker back as they were, or leave them off. */
+    suspend fun restoreAfterCall(restore: Boolean) {
+        val was = callQuiet.settle() ?: return
+        if (!restore) return
+        if (was.speakerOff != speakerOff) try { setSpeaker(was.speakerOff, "user") } catch (_: Failure) {}
+        if (was.muted != muted) try { setMuted(was.muted, "user") } catch (_: Failure) {}
+    }
+
+    private fun current() = CallQuiet.State(muted, speakerOff)
+
+    private fun fields(s: CallQuiet.State) = JSObject().put("muted", s.muted).put("speakerOff", s.speakerOff)
+
     /** Audio focus: a phone call (transient loss) takes the mic until it's over. */
     private fun focusChanged(change: Int) {
+        calls?.check()  // before Android 12 the only sign of a call ringing, starting or ending
         when (change) {
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> interrupt(true)
             AudioManager.AUDIOFOCUS_GAIN -> if (interrupted) interrupt(false)

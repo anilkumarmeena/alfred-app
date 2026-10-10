@@ -87,7 +87,7 @@ bundled page, `shell/index.html`, which asks for it. If the Mac can't be reached
   (FaceTime and other CallKit apps too), and the plugin mutes the mic and turns the speaker off before iOS even
   interrupts the audio. When the last call ends it sends a `call` event with what they were before (also in
   `getStatus().afterCall`), and the page offers to turn them back on; `restoreAfterCall({ restore })` is the answer.
-  Changing either meanwhile closes the offer. Android has neither yet: the page hides its speaker button there.
+  Changing either meanwhile closes the offer. Android does both too (below).
 - No Now Playing: the app takes no `MPRemoteCommandCenter` commands, so iOS shows no media card for it (that
   card always keeps dimmed ⏮ ⏭ slots an app can't remove, and doubled up with the Live Activity). The cost: the
   play/pause button of wired EarPods and other Bluetooth headsets goes to the last media app, not JARVIS.
@@ -144,6 +144,7 @@ The same features as iOS, with Android's own pieces:
 | AirPods stem press | headset buttons through a `MediaSession` |
 | APNs push | Firebase Cloud Messaging push |
 | Settings → JARVIS | long-press the app icon → **Change server** |
+| CallKit's `CXCallObserver` (calls quiet JARVIS) | `AudioManager`'s mode: the phone's own calls |
 | Mic Modes (Voice Isolation) | none: Android has no Mic Mode an app can read or offer |
 
 - **Keeping the mic alive.** `VoiceService` is a foreground service of type `microphone`. It runs for as long as
@@ -169,6 +170,15 @@ The same features as iOS, with Android's own pieces:
   doesn't promise to give focus back every time. So "Mic paused" is also cleared when the app comes on screen, or
   the user taps to unmute, if no phone call is ringing or going on (`AudioManager.getMode()`, `MicSync` in the
   core).
+- **Speaker off** (`setSpeaker`, `start({ speakerOff })`) works as on iOS: `speaker: "off"` in the token request,
+  then the `jarvis.speaker` participant attribute, the agent's track at volume 0, and no chime.
+- **Phone calls** (`CallWatch.kt`, `CallQuiet` in the core) mute the mic and turn the speaker off, then offer them
+  back when the call ends (the `call` event, `getStatus().afterCall`, `restoreAfterCall`), as on iOS.
+  - A call is detected from `AudioManager`'s mode (ringing, dialling or in a call), which needs no permission:
+    reading the phone state would need `READ_PHONE_STATE`. Android 12+ reports each mode change; before that it's
+    checked on every audio focus change.
+  - Unlike iOS's CallKit, this doesn't see other apps' internet calls (WhatsApp, Meet), which use the same
+    communication mode as JARVIS. Their audio focus still pauses the mic ("Mic paused").
 - **The mic track follows the mute** (`MicSync`), and **reconnects** work as on iOS, with `ConnectivityManager`
   for network changes.
 - **Notifications** (`PushNotifications.kt`, `JarvisMessagingService.kt`): heartbeat alerts and background tasks
@@ -357,7 +367,7 @@ better. Neither simulator has an earphone button to test.
 |---|---|
 | TypeScript (plugin API, shell page, hook) | typechecks; 13 vitest tests pass |
 | Swift core | 21 XCTest tests pass (`swiftc`) |
-| Kotlin core | **29 JUnit tests pass** through Gradle |
+| Kotlin core | **33 JUnit tests pass** through Gradle |
 | Android app, Kotlin plugin, service and activity | **compile**: `./gradlew assembleDebug` builds `app-debug.apk` with no Kotlin warnings |
 | Android on a phone | **not run yet**: the emulator can't start in the sandbox this was built in, and no phone was attached |
 | FCM end to end | not tried: needs your Firebase project (`google-services.json` and the Mac's service account) |
@@ -371,5 +381,6 @@ Things to check on a phone:
   - headset buttons reach the media session while it's in communication mode;
   - the call-style notification shows the timer, Mute/Unmute (with the chime) and Hang Up;
   - on Android 16, the status bar chip shows;
+  - a call mutes the mic and turns the speaker off, and the page offers both back after it;
   - "Mic paused" clears after a call;
   - a tapped alert opens its task.
