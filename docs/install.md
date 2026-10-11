@@ -6,15 +6,15 @@
 
 **Put JARVIS on an iPhone or an Android phone, turn on Android alerts, or try it in a simulator.**
 
-[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · [🍎 iOS](ios.md) · [🤖 Android](android.md) · [🔨 Build & test](build.md) · **📲 Install** · [🔗 JARVIS side](jarvis-side.md) · [🌐 Web hook](../web-hook/README.md) · [🔔 Push hook](../server-hook/README.md)
+[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · [🍎 iOS](ios.md) · [🤖 Android](android.md) · [🔨 Build & test](build.md) · **📲 Install** · [🤝 Contributing](../CONTRIBUTING.md)
 
 </div>
 
 ---
 
 > [!IMPORTANT]
-> Build first ([🔨 Build & test](build.md)), and have **Tailscale on, on both** the Mac and the phone. The page patch
-> from [🔗 JARVIS side](jarvis-side.md) is what lets the app keep the mic in the background.
+> Build first ([🔨 Build & test](build.md)), and have **Tailscale on, on both** the JARVIS computer and the phone, with
+> a current JARVIS (`master`) served by `make tailscale-serve` ([how](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#-get-it-on-your-phone)).
 
 ## 🍎 On the iPhone
 
@@ -45,7 +45,7 @@ enough.
 
 Then press Run again.
 
-**5. Open JARVIS** — enter `https://<mac-name>.<tailnet>.ts.net`, then the passcode on the page as usual. Allow the
+**5. Open JARVIS** — enter `https://<computer-name>.<tailnet>.ts.net`, then the passcode on the page as usual. Allow the
 microphone, then notifications when iOS asks (once the session is up). **Lock the phone and keep talking.**
 
 > [!WARNING]
@@ -74,7 +74,7 @@ xcrun devicectl device install app --device <device id> ../../.build/DeviceData/
 ## 🤖 On an Android phone
 
 **1. Enable USB debugging** — Settings → About phone → tap **Build number** seven times, then Settings → System →
-Developer options → **USB debugging** on. Plug it in and allow the Mac when asked.
+Developer options → **USB debugging** on. Plug it in and allow the computer when asked.
 
 **2. Install** — either `npm run android` and press Run in Android Studio with the phone selected, or:
 
@@ -85,7 +85,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 You can also copy the APK to the phone and open it, after allowing installs from that app.
 
-**3. Open JARVIS** — enter the Mac's Tailscale address, then the passcode. Allow the **microphone**, **notifications**
+**3. Open JARVIS** — enter the JARVIS computer's Tailscale address, then the passcode. Allow the **microphone**, **notifications**
 and **Nearby devices** (for Bluetooth headsets). The notification shows while a session is on.
 
 > [!TIP]
@@ -101,7 +101,7 @@ sides**:
 |:-:|---|---|
 | 1 | [Firebase console](https://console.firebase.google.com) | **Add project**, then **Add app → Android** |
 | 2 | The app | Put **google-services.json** in `android/app/`, rebuild, reinstall |
-| 3 | The Mac | Save a **service account key** in the jarvis repo, restart services |
+| 3 | The JARVIS computer | Save a **service account key** in the jarvis repo, restart services |
 | 4 | The phone | Start a session and allow notifications |
 
 - **Step 1:** Analytics isn't needed. Use package `com.anil.jarvis`, or yours if you changed `applicationId`.
@@ -114,13 +114,13 @@ sides**:
 
 | | Where | What to look for |
 |:-:|---|---|
-| ✅ | `logs/web.log` on the Mac | `app push token saved for android (fcm)` |
+| ✅ | `logs/web.log` on the computer | `app push token saved for android (fcm)` |
 | 📱 | The phone, app closed | The next finished background task or heartbeat alert |
 | ❌ | `logs/tasks.log` | `FCM push to android failed: …` |
 | 🔍 | `adb logcat -s JarvisAudio` | Failures on the phone |
 
-- The Mac keeps the tokens in `data/fcm_devices.json`, and drops one when FCM says it's no longer valid.
-- The Mac side is documented in the jarvis repo's `docs/mobile.md` (Android push on the Mac).
+- The computer keeps the tokens in `data/fcm_devices.json`, and drops one when FCM says it's no longer valid.
+- The computer's side is in the jarvis docs: [Android push: on the computer](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#android-push-on-the-computer).
 
 ## 💻 Emulator and simulator
 
@@ -141,6 +141,6 @@ adb reverse tcp:8787 tcp:8787 && adb reverse tcp:7880 tcp:7880
 
 <div align="center">
 
-[← 🔨 Build & test](build.md) &nbsp;·&nbsp; [🏠 Home](../README.md) &nbsp;·&nbsp; [🔗 JARVIS side →](jarvis-side.md)
+[← 🔨 Build & test](build.md) &nbsp;·&nbsp; [🏠 Home](../README.md) &nbsp;·&nbsp; [🤝 Contributing →](../CONTRIBUTING.md)
 
 </div>

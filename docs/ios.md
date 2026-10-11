@@ -6,7 +6,7 @@
 
 **How the Swift plugin (`packages/jarvis-audio/ios`) keeps a JARVIS session alive on the iPhone.**
 
-[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · **🍎 iOS** · [🤖 Android](android.md) · [🔨 Build & test](build.md) · [📲 Install](install.md) · [🔗 JARVIS side](jarvis-side.md) · [🌐 Web hook](../web-hook/README.md) · [🔔 Push hook](../server-hook/README.md)
+[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · **🍎 iOS** · [🤖 Android](android.md) · [🔨 Build & test](build.md) · [📲 Install](install.md) · [🤝 Contributing](../CONTRIBUTING.md)
 
 </div>
 
@@ -233,8 +233,8 @@ environment comes from the build's provisioning profile: `development` for Xcode
 **3. Open on tap** — a tapped notification opens its page, e.g. `/?task=3`, **on the saved server only**.
 
 > [!IMPORTANT]
-> Needs the jarvis side in [🔔 Push hook](../server-hook/README.md), and a **paid developer team**: a Personal Team
-> can't sign push.
+> Needs **APNs set up on the JARVIS computer** ([how](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#ios-push-on-the-computer)), and a **paid developer
+> team**: a Personal Team can't sign push.
 
 ## 🔧 Settings
 

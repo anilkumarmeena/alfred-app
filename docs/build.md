@@ -6,7 +6,7 @@
 
 **Everything you need to build both apps, run every test suite, and see what's been verified so far.**
 
-[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · [🍎 iOS](ios.md) · [🤖 Android](android.md) · **🔨 Build & test** · [📲 Install](install.md) · [🔗 JARVIS side](jarvis-side.md) · [🌐 Web hook](../web-hook/README.md) · [🔔 Push hook](../server-hook/README.md)
+[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · [🍎 iOS](ios.md) · [🤖 Android](android.md) · **🔨 Build & test** · [📲 Install](install.md) · [🤝 Contributing](../CONTRIBUTING.md)
 
 </div>
 
@@ -47,7 +47,7 @@ npm run sync      # builds the plugin's TypeScript, then npx cap sync (both plat
 - To bake in a default address (the app's own setting still wins):
 
 ```sh
-JARVIS_SERVER_URL=https://<mac>.<tailnet>.ts.net npm run sync
+JARVIS_SERVER_URL=https://<computer>.<tailnet>.ts.net npm run sync
 ```
 
 ## 🍎 iOS
@@ -80,32 +80,27 @@ cd android
 
 | | Command | What it runs |
 |:-:|---|---|
-| 🧪 | `npm test` | vitest: the page hook (`web-hook/native.ts`) against a fake plugin |
-| 📐 | `npm run typecheck` | TypeScript for the config, shell page, hook and plugin API |
+| 📐 | `npm run typecheck` | TypeScript for the config, shell page and plugin API |
 | 🍎 | `npm run test:ios` | `swift test` for JarvisAudioCore |
+| 🍎 | `npm run test:ios-direct` | The same tests with plain `swiftc` + `xctest` |
 | 🤖 | `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle |
-| 🌐 | `npm run check:web-patch` | `jarvis-web.patch` on a copy of `../jarvis/web` |
-| 🔧 | `npm run check:preferences-patch` | `jarvis-preferences.patch` on a copy of the jarvis repo |
-| 🎤 | `npm run check:mic-sync-patch` | `jarvis-mic-sync.patch` on a copy of `../jarvis/web` |
-| 🔔 | `npm run check:server-patch` | `jarvis-native-push.patch` on a copy of the jarvis package |
+| 🤖 | `npm run test:android-direct` | The Kotlin tests with Android Studio's `kotlinc`, no Gradle |
+| 🏗️ | `npm run build:ios-sim` | Unsigned simulator build of the iOS app |
+| 🏗️ | `npm run build:android` | `./gradlew assembleDebug` |
 
 - **`test:ios`** covers server addresses, token replies, reconnect timing, captions, the chime and the Live
-  Activity's status line. **`test:ios-direct`** does the same with plain `swiftc` + `xctest`.
+  Activity's status line. **`test:ios-direct`** is for when `swift test` can't write its build folder.
 - **`test:android`** also covers the notification page links and the "is a call holding the audio" check.
-  **`test:android-direct`** compiles it with Android Studio's bundled Kotlin compiler instead, without Gradle.
-- **`check:web-patch`** applies the patch, then typechecks the copy and runs its tests.
-- **`check:preferences-patch`** typechecks the web app and runs its tests and the panel's Python tests.
-- **`check:mic-sync-patch`** also checks its `bindNative` matches `web-hook/native.ts`, then typechecks and tests.
-- **`check:server-patch`** copies the jarvis Python package and tests, and runs them with the jarvis project's
-  environment.
-- The `check:*` scripts never touch the jarvis repo itself. They look for it at `../jarvis`; set `JARVIS_REPO` to
-  point elsewhere.
+- **`test:android-direct`** is for when Gradle can't fetch its plugins. It needs JUnit 4.13.2 and Hamcrest 1.3 in
+  `~/.gradle`'s cache (any earlier Android build puts them there), and looks for Android Studio in `/Applications`
+  unless `ANDROID_STUDIO` is set.
+- The page side (`web/src/lib/native.ts`) is tested in the jarvis repo, with its web tests.
 
 ## 📊 Status
 
 | Piece | State |
 |---|---|
-| TypeScript (plugin API, shell page, hook) | ✅ typechecks; **16 vitest tests** pass |
+| TypeScript (plugin API, shell page) | ✅ typechecks |
 | Swift core | ✅ **35 XCTest tests** pass |
 | Kotlin core | ✅ **33 JUnit tests** pass through Gradle |
 | Android app, Kotlin plugin, service and activity | ✅ **compile** with no Kotlin warnings |
@@ -115,7 +110,7 @@ cd android
 - The Android build is `./gradlew assembleDebug`, producing `app-debug.apk`.
 - Android hasn't run on a phone: the emulator can't start in the sandbox this was built in, and no phone was
   attached.
-- FCM needs your Firebase project (`google-services.json` and the Mac's service account).
+- FCM needs your Firebase project (`google-services.json`, and its service account on the JARVIS computer).
 
 ## 📱 Things to check on a phone
 

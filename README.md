@@ -9,15 +9,16 @@
 [![Android 8+](https://img.shields.io/badge/android-8.0%2B%20(API%2026)-3ddc84?style=flat-square&logo=android&logoColor=white)](docs/android.md)
 [![LiveKit](https://img.shields.io/badge/audio-LiveKit%20native%20SDKs-4fd1ff?style=flat-square)](docs/architecture.md)
 [![Swift · Kotlin · TypeScript](https://img.shields.io/badge/Swift%20·%20Kotlin%20·%20TS-555?style=flat-square)](packages/jarvis-audio)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
-**[Architecture](docs/architecture.md)** &nbsp;·&nbsp; **[Install](docs/install.md)** &nbsp;·&nbsp; **[JARVIS side](docs/jarvis-side.md)** &nbsp;·&nbsp; **[Build & test](docs/build.md)**
+**[Architecture](docs/architecture.md)** &nbsp;·&nbsp; **[Install](docs/install.md)** &nbsp;·&nbsp; **[Build & test](docs/build.md)** &nbsp;·&nbsp; **[Contributing](CONTRIBUTING.md)**
 
 </div>
 
 ---
 
 The phone app for **JARVIS**, a personal voice assistant, built with **Capacitor**. It shows the **live JARVIS web
-page from the Mac**, so changes to the page in the jarvis repo show up **without rebuilding the app**. The voice
+page from the JARVIS computer**, so changes to the page in the jarvis repo show up **without rebuilding the app**. The voice
 session runs in a native plugin, **JarvisAudio**, not in the web view, so it **keeps going with the screen
 locked**.
 
@@ -119,11 +120,11 @@ flowchart TB
         Page["🌐 Live JARVIS page<br/>in the web view"]
         Plugin["🎧 JarvisAudio plugin<br/>Swift / Kotlin"]
     end
-    subgraph Mac["🖥️ Mac"]
+    subgraph Computer["🖥️ JARVIS computer"]
         direction LR
         Web["🌐 jarvis.web<br/>:8787"]
         LK["📡 LiveKit<br/>:7880"]
-        Agent["🧠 agent.py<br/>Whisper → Claude → Kokoro"]
+        Agent["🧠 voice agent<br/>Whisper → Claude → Kokoro"]
     end
     Page -->|"start / setMuted"| Plugin
     Plugin -.->|events| Page
@@ -137,20 +138,21 @@ flowchart TB
     class Page,Plugin you
     class Web,LK,Agent mac
     style Phone fill:#f8fafc,stroke:#94a3b8,color:#334155
-    style Mac fill:#f8fafc,stroke:#94a3b8,color:#334155
+    style Computer fill:#f8fafc,stroke:#94a3b8,color:#334155
 ```
 
 - **The page stays the UI.** In the app it calls the plugin instead of opening its own LiveKit `Room`.
 - **The plugin owns the connection**, because the web view's JavaScript is suspended in the background.
-- **Nothing changes on the Mac** for the voice session: same `/api/token`, passcode and Tailscale Serve setup.
+- **Nothing to patch on the computer:** JARVIS already has the page's bridge, `/api/token` and the push endpoints.
 
 Full story in **[🧱 Architecture](docs/architecture.md)**.
 
 ## 🚀 Quickstart
 
 > [!IMPORTANT]
-> Needs **Node 20+**, **Xcode 16.3+** (for the LiveKit Swift package) and **Android Studio** with JDK 21, plus the
-> **jarvis repo** checked out next to this one and **Tailscale** on both the Mac and the phone.
+> Needs **Node 20+**, **Xcode 16.3+** on a Mac (for iOS and the LiveKit Swift package) and **Android Studio** with
+> JDK 21, plus a running **[JARVIS](https://github.com/anilkumarmeena/jarvis)** and **Tailscale** on both the JARVIS
+> computer and the phone.
 
 **1. Install and sync** — builds the plugin's TypeScript, then `npx cap sync` for both platforms:
 
@@ -159,12 +161,11 @@ npm install
 npm run sync
 ```
 
-**2. Patch the page** — apply `web-hook/jarvis-web.patch` to the jarvis repo and rebuild it
-([how](web-hook/README.md)):
+**2. Serve JARVIS on the tailnet** — run a current JARVIS (`master`), then on its computer
+([how](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#-get-it-on-your-phone)):
 
 ```sh
-npm run check:web-patch
-cd ../jarvis && git apply ../jarvis-app/web-hook/jarvis-web.patch && make web-build
+make tailscale-serve
 ```
 
 **3. Run it on the phone** — opens Xcode or Android Studio; pick the phone and press Run:
@@ -173,7 +174,7 @@ cd ../jarvis && git apply ../jarvis-app/web-hook/jarvis-web.patch && make web-bu
 npm run ios        # or: npm run android
 ```
 
-**4. Connect** — enter `https://<mac-name>.<tailnet>.ts.net`, then the passcode, and allow the microphone. Lock the
+**4. Connect** — enter `https://<computer-name>.<tailnet>.ts.net`, then the passcode, and allow the microphone. Lock the
 phone and keep talking.
 
 > [!TIP]
@@ -186,9 +187,9 @@ phone and keep talking.
 | 🔄 | `npm run sync` | Build the plugin, then `npx cap sync` |
 | 🍎 | `npm run ios` | Open the iOS project in Xcode |
 | 🤖 | `npm run android` | Open the Android project in Android Studio |
-| 🧪 | `npm test` | vitest for the page hook |
-| 📐 | `npm run typecheck` | Typecheck config, shell page, hook and plugin API |
-| 🧩 | `npm run check:web-patch` | Dry-run the page patch against a copy of jarvis |
+| 📐 | `npm run typecheck` | Typecheck the config, shell page and plugin API |
+| 🧪 | `npm run test:ios` | Swift unit tests for the plugin's core |
+| 🧪 | `npm run test:android` | The same logic in Kotlin, through Gradle |
 
 The full list is in **[🔨 Build & test](docs/build.md#-tests)**.
 
@@ -199,7 +200,7 @@ The full list is in **[🔨 Build & test](docs/build.md#-tests)**.
 <td width="50%" valign="top">
 
 **[🧱 Architecture](docs/architecture.md)**<br>
-What the page does, what the app does, how the page is loaded, and the repo layout.
+What the page does, what the app does, the server side, and the repo layout.
 
 </td>
 <td width="50%" valign="top">
@@ -232,22 +233,8 @@ Put it on an iPhone or Android phone, set up Firebase, use an emulator.
 </td>
 <td width="50%" valign="top">
 
-**[🔗 JARVIS side](docs/jarvis-side.md)**<br>
-The five changes the jarvis repo needs, and which are optional.
-
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-
-**[🌐 Web hook](web-hook/README.md)**<br>
-The page patches: native session, Preferences, mic state sync, and the plugin API.
-
-</td>
-<td width="50%" valign="top">
-
-**[🔔 Push hook](server-hook/README.md)**<br>
-The server patch that sends JARVIS's alerts to the iPhone app through APNs.
+**[🤝 Contributing](CONTRIBUTING.md)**<br>
+Setup, the checks a pull request must pass, and the code style.
 
 </td>
 </tr>
@@ -257,7 +244,7 @@ The server patch that sends JARVIS's alerts to the iPhone app through APNs.
 
 | Piece | State |
 |---|---|
-| TypeScript (plugin API, shell page, hook) | ✅ typechecks; **16 vitest tests** pass |
+| TypeScript (plugin API, shell page) | ✅ typechecks |
 | Swift core | ✅ **35 XCTest tests** pass |
 | Kotlin core | ✅ **33 JUnit tests** pass through Gradle |
 | Android app, plugin, service, activity | ✅ `assembleDebug` builds with no Kotlin warnings |
@@ -268,12 +255,16 @@ The server patch that sends JARVIS's alerts to the iPhone app through APNs.
   was attached.
 - The checklist for a first run on real phones is in [🔨 Build & test](docs/build.md#-things-to-check-on-a-phone).
 
+## 📄 License
+
+**[MIT](LICENSE)**. Contributions are welcome: start with **[🤝 Contributing](CONTRIBUTING.md)**.
+
 ---
 
 <div align="center">
 
 <img src="docs/assets/logo.svg" width="48" alt="">
 
-<sub>JARVIS on your phone · the page from the Mac, the audio native</sub>
+<sub>JARVIS on your phone · the page from the computer, the audio native</sub>
 
 </div>

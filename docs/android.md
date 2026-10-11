@@ -6,7 +6,7 @@
 
 **The same features as iOS, built from Android's own pieces in the Kotlin plugin (`packages/jarvis-audio/android`).**
 
-[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · [🍎 iOS](ios.md) · **🤖 Android** · [🔨 Build & test](build.md) · [📲 Install](install.md) · [🔗 JARVIS side](jarvis-side.md) · [🌐 Web hook](../web-hook/README.md) · [🔔 Push hook](../server-hook/README.md)
+[🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · [🍎 iOS](ios.md) · **🤖 Android** · [🔨 Build & test](build.md) · [📲 Install](install.md) · [🤝 Contributing](../CONTRIBUTING.md)
 
 </div>
 
@@ -121,14 +121,14 @@ first time, with the mic.
 
 **2. Post the token** — to `/api/push/native`, with the passcode, `"service": "fcm"` and its package name.
 
-**3. Show the alert** — the Mac sends **data messages**, which the app shows itself in an **Alerts** channel. A newer
+**3. Show the alert** — the JARVIS computer sends **data messages**, which the app shows itself in an **Alerts** channel. A newer
 push with the same tag replaces the older one.
 
 **4. Open on tap** — a tapped notification opens its page, e.g. `/?task=3`, **on the saved server only**.
 
 > [!IMPORTANT]
 > Needs a **Firebase project**: `android/app/google-services.json` in the app (git-ignored), and that project's
-> service account on the Mac. See [📲 Install → Android notifications](install.md#-android-notifications-firebase).
+> service account on the JARVIS computer. See [📲 Install → Android notifications](install.md#-android-notifications-firebase).
 > An app built without the file works the same, just with no alerts, and logs that once.
 
 ---
