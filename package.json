@@ -8,17 +8,12 @@
     "build": "npm --prefix packages/jarvis-audio run build",
     "sync": "npm run build && cap sync",
     "typecheck": "tsc --noEmit -p tsconfig.json && npm --prefix packages/jarvis-audio run typecheck",
-    "test": "vitest run",
     "test:ios": "sh scripts/swift-test.sh",
     "test:ios-direct": "sh scripts/swift-test-direct.sh",
     "test:android": "cd android && ./gradlew :jarvis-audio:testDebugUnitTest",
     "test:android-direct": "sh scripts/kotlin-test-direct.sh",
     "build:ios-sim": "sh scripts/build-ios-sim.sh",
     "build:android": "cd android && ./gradlew assembleDebug",
-    "check:web-patch": "sh scripts/check-web-patch.sh",
-    "check:server-patch": "sh scripts/check-server-patch.sh",
-    "check:preferences-patch": "sh scripts/check-preferences-patch.sh",
-    "check:mic-sync-patch": "sh scripts/check-mic-sync-patch.sh",
     "ios": "cap open ios",
     "android": "cap open android"
   },
@@ -30,7 +25,6 @@
   },
   "devDependencies": {
     "@capacitor/cli": "^7.6.9",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.7"
+    "typescript": "^5.9.3"
   }
 }

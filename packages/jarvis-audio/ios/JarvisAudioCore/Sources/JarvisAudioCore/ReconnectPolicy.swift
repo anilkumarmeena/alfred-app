@@ -1,12 +1,10 @@
 import Foundation
 
-/// How long to wait before each attempt to bring a lost session back. LiveKit itself resumes short drops
-/// (ICE restarts, signal reconnects); this is for when it gives up and the room is gone: fetch a fresh token
-/// and join again. Quick at first, then every half minute, for as long as the session is wanted. A network
-/// change skips the wait (see `SessionController`).
+/// Backoff for rejoining with a fresh token once LiveKit's own resume (ICE restart, signal reconnect) gives up.
+/// Retries forever while the session is wanted; a network change skips the wait.
 public struct ReconnectPolicy: Sendable {
     public var delays: [TimeInterval]
-    /// Up to this fraction of each delay is added at random, so a phone and a tablet don't retry in step.
+    /// Random extra fraction of each delay, so several devices don't retry in step.
     public var jitter: Double
 
     public init(delays: [TimeInterval] = [1, 2, 4, 8, 15, 30], jitter: Double = 0.2) {
@@ -14,7 +12,7 @@ public struct ReconnectPolicy: Sendable {
         self.jitter = jitter
     }
 
-    /// The wait before attempt `attempt` (from 1). `random` is in 0..<1.
+    /// `attempt` counts from 1; `random` is in 0..<1.
     public func delay(attempt: Int, random: Double = Double.random(in: 0..<1)) -> TimeInterval {
         guard let last = delays.last else { return 0 }
         let base = attempt >= 1 && attempt <= delays.count ? delays[attempt - 1] : last
@@ -31,7 +29,7 @@ public enum DisconnectCause: Equatable, Sendable {
     case duplicateIdentity
     case unknown
 
-    /// Rejoin on our own? Only when nobody meant it to end.
+    /// Only when nobody meant the session to end.
     public var shouldReconnect: Bool {
         switch self {
         case .network, .unknown: return true

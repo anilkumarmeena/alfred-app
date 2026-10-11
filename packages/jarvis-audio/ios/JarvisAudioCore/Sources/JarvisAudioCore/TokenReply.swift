@@ -1,12 +1,12 @@
 import Foundation
 
-/// What jarvis.web's /api/token gives back: a LiveKit token and the URL to join with it.
+/// A LiveKit token from /api/token and the URL to join with it.
 public struct Grant: Equatable, Sendable {
     public let token: String
     public let url: String
 }
 
-/// Why /api/token didn't give a grant. The messages are the page's own, so the app says the same things.
+/// Messages match the page's.
 public enum TokenError: Error, Equatable {
     case unauthorized  // 401: wrong passcode
     case rateLimited(String)  // 429: too many wrong passcodes lately
@@ -21,7 +21,7 @@ public enum TokenError: Error, Equatable {
         }
     }
 
-    /// The failure code the plugin reports, as in its TypeScript definitions.
+    /// As in the plugin's TypeScript definitions.
     public var code: String {
         switch self {
         case .unauthorized: return "UNAUTHORIZED"
@@ -30,7 +30,7 @@ public enum TokenError: Error, Equatable {
         }
     }
 
-    /// Worth trying again later without the user: a server hiccup, not a refusal.
+    /// A server hiccup rather than a refusal.
     public var isRetryable: Bool {
         switch self {
         case .unauthorized, .rateLimited: return false
@@ -40,7 +40,7 @@ public enum TokenError: Error, Equatable {
 }
 
 public enum TokenReply {
-    /// The request body, as the page sends it. `speakerOff`: JARVIS replies in text only, from the session's first word.
+    /// `speakerOff`: JARVIS replies in text only from the session's first word.
     public static func body(passcode: String, device: String, speakerOff: Bool = false) -> Data {
         let fields = ["passcode": passcode, "device": device, "speaker": speakerOff ? "off" : "on"]
         return (try? JSONSerialization.data(withJSONObject: fields)) ?? Data()

@@ -1,8 +1,8 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
-// The JarvisAudio Capacitor plugin for iOS. `npx cap sync` adds it to ios/App/CapApp-SPM by this name.
-// Its plain-Swift logic is the JarvisAudioCore package next to it, tested on its own (npm run test:ios).
+// `npx cap sync` adds this plugin to ios/App/CapApp-SPM by this name. Plain-Swift logic lives in JarvisAudioCore
+// (npm run test:ios).
 let package = Package(
     name: "JarvisAudio",
     platforms: [.iOS(.v17)],

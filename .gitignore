@@ -1,19 +1,9 @@
 .DS_Store
 .env
 .env.*
-!.env.example
 node_modules/
-venv/
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
 dist/
 build/
-.next/
-coverage/
 *.log
 
 # Local build output: DerivedData, SwiftPM checkouts, test bundles, scratch copies
@@ -28,5 +18,5 @@ local.properties
 *.iml
 xcuserdata/
 
-# Firebase config for Android push (per user: your own Firebase project)
+# Per-user Firebase config for Android push
 android/app/google-services.json

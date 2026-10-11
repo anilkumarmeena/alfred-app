@@ -62,8 +62,7 @@
 	</array>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- JARVIS is reached over Tailscale Serve's HTTPS address. Plain http only for local addresses
-		     (http://localhost:8787 in the simulator, a .local name or a LAN IP while developing). -->
+		<!-- JARVIS is HTTPS via Tailscale Serve; plain http only for local dev addresses (localhost, .local, LAN IPs). -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>

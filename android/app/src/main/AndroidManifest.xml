@@ -32,19 +32,9 @@
 
         </activity>
 
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
-        </provider>
     </application>
 
-    <!-- Permissions. The mic, foreground service, notification and Bluetooth ones come from the JarvisAudio
-         plugin's manifest (packages/jarvis-audio/android/src/main/AndroidManifest.xml). -->
+    <!-- Mic, foreground service, notification and Bluetooth permissions come from the JarvisAudio plugin's manifest. -->
 
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

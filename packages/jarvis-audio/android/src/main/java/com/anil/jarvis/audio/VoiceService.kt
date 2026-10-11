@@ -20,14 +20,9 @@ import android.view.KeyEvent
 import com.anil.jarvis.audio.core.SessionSummary
 
 /**
- * Keeps JARVIS in the foreground while a session is wanted: a microphone-type foreground service, so Android lets
- * the mic run with the screen off or another app in front. Its notification is Android's counterpart of the iOS Live
- * Activity: **JARVIS**, what it's doing ([SessionSummary]), the session's running time, and Mute/Unmute and Hang Up.
- * On Android 12+ it's a call-style notification (JARVIS is a call the user left running), which the lock screen
- * and the status bar show as an ongoing call, and on Android 16 it asks to be promoted to a Live Update. Tapping
- * elsewhere opens the app. Its media session takes headset button presses (wired hook, Bluetooth play/pause) and
- * turns them into mute toggles; there's no media card (no MediaStyle), as there's no Now Playing on iOS. The session
- * itself is [VoiceSession]; this only keeps it alive and shows it.
+ * Microphone-type foreground service that keeps [VoiceSession]'s mic alive with the screen off. Its notification is
+ * the counterpart of the iOS Live Activity: a call-style notification on Android 12+, promoted to a Live Update on
+ * Android 16. Its media session turns headset presses into mute toggles; no MediaStyle card, as iOS has no Now Playing.
  */
 class VoiceService : Service() {
     companion object {
@@ -37,7 +32,7 @@ class VoiceService : Service() {
         private const val ACTION_MUTE = "com.anil.jarvis.audio.MUTE"
         private const val ACTION_UNMUTE = "com.anil.jarvis.audio.UNMUTE"
         private const val ACTION_END = "com.anil.jarvis.audio.END"
-        // Notification.EXTRA_REQUEST_PROMOTED_ONGOING (Android 16), by name so the plugin builds against SDK 35
+        // Notification.EXTRA_REQUEST_PROMOTED_ONGOING (Android 16), by name so this builds against SDK 35
         private const val EXTRA_PROMOTED_ONGOING = "android.requestPromotedOngoing"
         private var running: VoiceService? = null
 
@@ -52,9 +47,9 @@ class VoiceService : Service() {
     }
 
     private lateinit var media: MediaSession
-    private var shown: Pair<SessionSummary?, Long?>? = null  // what the notification last showed
+    private var shown: Pair<SessionSummary?, Long?>? = null
 
-    // Built once: each PendingIntent is a call to the system.
+    // Lazy: each PendingIntent is a system call.
     private val open by lazy {
         packageManager.getLaunchIntentForPackage(packageName)?.let {
             PendingIntent.getActivity(this, 0, it.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE)
@@ -99,14 +94,14 @@ class VoiceService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        goForeground()  // first, every time: Android stops a foreground-started service that doesn't
+        goForeground()  // every time: Android kills a startForegroundService() service that doesn't call it
         when (intent?.action) {
             ACTION_MUTE -> VoiceSession.setMutedOffPage(true)
             ACTION_UNMUTE -> VoiceSession.setMutedOffPage(false)
             ACTION_END -> VoiceSession.stop()
         }
         if (VoiceSession.active) refresh() else stopSelf()
-        return START_NOT_STICKY  // after the process dies there's no session to come back to
+        return START_NOT_STICKY  // the session doesn't survive process death
     }
 
     override fun onDestroy() {
@@ -116,7 +111,7 @@ class VoiceService : Service() {
         super.onDestroy()
     }
 
-    // The user swiped JARVIS away from recents: end the session rather than listen with no app.
+    // Swiped away from recents: end the session rather than listen with no app.
     override fun onTaskRemoved(rootIntent: Intent?) {
         VoiceSession.stop()
         super.onTaskRemoved(rootIntent)
@@ -139,7 +134,7 @@ class VoiceService : Service() {
         val now = VoiceSession.summary to VoiceSession.startedAt
         if (now == shown) return
         shown = now
-        // Playing while the mic is live, so headset presses come here; the state is never shown as a media card.
+        // "Playing" while the mic is live, so headset presses are routed here.
         media.setPlaybackState(PlaybackState.Builder()
             .setActions(PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or PlaybackState.ACTION_STOP)
             .setState(if (VoiceSession.muted) PlaybackState.STATE_PAUSED else PlaybackState.STATE_PLAYING, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f)
@@ -166,12 +161,12 @@ class VoiceService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_CALL)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)  // nothing private in it: shown in full on the lock screen
+            .setVisibility(Notification.VISIBILITY_PUBLIC)  // nothing private: show in full on the lock screen
             .apply {
-                // The running time, from when the room was first joined, as the Live Activity shows it.
+                // Running time since the room was first joined, as on the Live Activity.
                 if (startedAt != null) setWhen(startedAt).setShowWhen(true).setUsesChronometer(true) else setShowWhen(false)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    // Hang Up is the call style's own red button; Mute goes beside it.
+                    // Hang Up is the call style's own button; Mute goes beside it.
                     setStyle(Notification.CallStyle.forOngoingCall(jarvis, hangUp))
                     addAction(muteAction)
                     setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
@@ -179,8 +174,7 @@ class VoiceService : Service() {
                     addAction(muteAction)
                     addAction(action(R.drawable.jarvis_audio_end, "Hang Up", hangUp))
                 }
-                // Android 16: a Live Update, at the top of the lock screen and as a chip in the status bar. Ignored
-                // before 16, and when the user turns Live Updates off for JARVIS.
+                // Android 16 Live Update (lock screen top, status bar chip); ignored before 16 or when turned off.
                 addExtras(Bundle().apply { putBoolean(EXTRA_PROMOTED_ONGOING, true) })
             }
             .build()

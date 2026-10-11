@@ -1,8 +1,7 @@
 #!/bin/sh
-# The plugin's Kotlin unit tests (com.anil.jarvis.audio.core) without Gradle: Android Studio's bundled Kotlin
-# compiler builds them, and JUnit runs them. For when Gradle can't download its plugins; normally use
-# `npm run test:android`. OUT (default .build/kotlin) holds the build. Needs junit 4.13.2 and hamcrest 1.3 in
-# ~/.gradle's cache (any earlier Android build puts them there).
+# The plugin's Kotlin unit tests (audio.core) without Gradle, for when Gradle can't fetch its plugins (normally
+# `npm run test:android`): Android Studio's bundled kotlinc builds, JUnit runs. $1: build dir (default .build/kotlin).
+# Needs junit 4.13.2 and hamcrest 1.3 in ~/.gradle's cache (any earlier Android build puts them there).
 set -e
 root="$(cd "$(dirname "$0")/.." && pwd)"
 plugin="$root/packages/jarvis-audio/android/src"

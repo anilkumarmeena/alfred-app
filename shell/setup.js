@@ -1,6 +1,6 @@
 // @ts-check
-// The first-run page: ask for the server address and hand it to the plugin, which checks it, saves it and
-// loads the live page from there. No imports: Capacitor's bridge puts the plugin on window.Capacitor.
+// Hands the server address to the plugin, which validates, saves and loads it. No imports: Capacitor's bridge
+// exposes the plugin on window.Capacitor.
 (function () {
   const form = /** @type {HTMLFormElement} */ (document.getElementById("setup"));
   const input = /** @type {HTMLInputElement} */ (document.getElementById("url"));
@@ -23,7 +23,7 @@
     error.textContent = "";
     button.disabled = true;
     try {
-      await plugin.setServerUrl({ url: input.value });  // loads the page from there, replacing this one
+      await plugin.setServerUrl({ url: input.value });  // navigates away on success
     } catch (err) {
       error.textContent = /** @type {Error} */ (err).message || String(err);
       button.disabled = false;

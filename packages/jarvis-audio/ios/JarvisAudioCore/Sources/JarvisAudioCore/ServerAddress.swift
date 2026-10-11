@@ -1,7 +1,6 @@
 import Foundation
 
-/// The JARVIS web app's address, as typed on the first-run page or in Settings: `mac.tailnet.ts.net`,
-/// `https://mac.tailnet.ts.net/`, `http://localhost:8787`. Reduced to its origin, since the page lives at `/`.
+/// A typed JARVIS address (`mac.tailnet.ts.net`, `http://localhost:8787`…) reduced to its origin; the page lives at `/`.
 public struct ServerAddress: Equatable, Sendable {
     public let origin: URL
 
@@ -34,15 +33,14 @@ public struct ServerAddress: Equatable, Sendable {
     public var string: String { origin.absoluteString }
     public var host: String { origin.host ?? "" }
 
-    /// jarvis.web's token endpoint: POST {"passcode", "device"} → {"token", "url"}.
+    /// POST {"passcode", "device"} → {"token", "url"}.
     public var tokenURL: URL { origin.appendingPathComponent("api/token") }
 
-    /// Where the app hands jarvis.web its APNs token: POST {"passcode", "device", "token", "environment", "topic"}.
+    /// POST {"passcode", "device", "token", "environment", "topic"}.
     public var pushURL: URL { origin.appendingPathComponent("api/push/native") }
 
-    /// The page a notification opens when tapped: its `url`, such as /?task=3, on this server, with its title and
-    /// body after the # as the page's service worker puts them (#title=…&body=…). Nil for a URL on another host,
-    /// so a notification can't point the web view somewhere else.
+    /// A notification's page on this server, with title and body in the fragment as the service worker puts them
+    /// (#title=…&body=…). Nil for another host, so a notification can't point the web view elsewhere.
     public func page(_ url: String, title: String? = nil, body: String? = nil) -> URL? {
         guard let resolved = URL(string: url, relativeTo: origin)?.absoluteURL,
               var parts = URLComponents(url: resolved, resolvingAgainstBaseURL: false),
@@ -59,14 +57,14 @@ public struct ServerAddress: Equatable, Sendable {
         return parts.url
     }
 
-    /// Plain http, which iOS only allows for local addresses.
+    /// iOS allows plain http only for local addresses.
     public var isCleartext: Bool { origin.scheme == "http" }
 
     public static func message(for problem: Problem) -> String {
         switch problem {
         case .empty: return "Enter JARVIS's address."
         case .unsupportedScheme(let s): return "\(s):// isn't a web address. Use https://."
-        case .noHost: return "That doesn't look like an address. Try https://your-mac.your-tailnet.ts.net."
+        case .noHost: return "That doesn't look like an address. Try https://your-computer.your-tailnet.ts.net."
         }
     }
 }

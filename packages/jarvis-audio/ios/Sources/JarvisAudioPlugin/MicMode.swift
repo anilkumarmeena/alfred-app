@@ -6,26 +6,18 @@ import UIKit
 
 let micModeLog = Logger(subsystem: "com.anil.jarvis", category: "micmode")
 
-/// iOS's Mic Modes: Standard, Voice Isolation and Wide Spectrum. They run inside Apple's voice processing
-/// (AUVoiceIO), which LiveKit's engine uses with the playAndRecord / voiceChat session, so Control Center
-/// offers them for JARVIS while the mic is on. An app can't choose the mode: up to the iOS 27 SDK,
-/// AVCaptureDevice.preferredMicrophoneMode and activeMicrophoneMode are read-only, and the most an app can do
-/// is open the system picker. So:
-/// - the first time in each launch that the mic goes live in a session and Voice Isolation isn't chosen, the
-///   picker opens on its own (when the app is on screen). Once it's chosen, iOS remembers it for the app and
-///   the picker stays shut.
-/// - the page draws a Mic pill during a session from the micMode events and status, and opens the picker any
-///   time through showMicModes.
-/// - both properties are watched with KVO, for the page's micMode events.
+/// iOS Mic Modes (Standard, Voice Isolation, Wide Spectrum) run inside Apple's voice processing (AUVoiceIO),
+/// which LiveKit uses with playAndRecord/voiceChat. Apps can't set the mode (read-only through the iOS 27 SDK),
+/// only open the system picker. So the picker opens once per launch when the mic first goes live without Voice
+/// Isolation (iOS remembers the choice per app), and the page can open it any time via showMicModes.
 @MainActor
 final class MicMode: NSObject {
-    /// The mode changed: for the page.
     var onChange: ((MicMode) -> Void)?
 
-    private(set) var active = AVCaptureDevice.activeMicrophoneMode  // what's processing the mic now
-    private(set) var preferred = AVCaptureDevice.preferredMicrophoneMode  // what the user picked
-    private var prompted = false  // the picker opened on its own this launch
-    private var due = false  // the mic is live and the picker should open once the app is on screen
+    private(set) var active = AVCaptureDevice.activeMicrophoneMode
+    private(set) var preferred = AVCaptureDevice.preferredMicrophoneMode  // the user's pick
+    private var prompted = false  // auto-opened this launch
+    private var due = false  // should open once the app is in the foreground
     private var settle: Task<Void, Never>?
     private var sessionOn = false
 
@@ -33,7 +25,7 @@ final class MicMode: NSObject {
 
     override init() {
         super.init()
-        // Class properties, so the class object is what's observed.
+        // Class properties: observe the class object.
         for key in Self.keys { AVCaptureDevice.self.addObserver(self, forKeyPath: key, options: [.new], context: nil) }
         let nc = NotificationCenter.default
         nc.addObserver(self, selector: #selector(appActive), name: UIApplication.didBecomeActiveNotification, object: nil)
@@ -48,7 +40,7 @@ final class MicMode: NSObject {
 
     var state: [String: Any] { ["active": Self.name(active), "preferred": Self.name(preferred)] }
 
-    // MARK: - The session's side
+    // MARK: - Session
 
     func sessionStarted() {
         sessionOn = true
@@ -60,13 +52,13 @@ final class MicMode: NSObject {
         micStopped()
     }
 
-    /// The mic is recording in a session: just joined, unmuted, or back after a call.
+    /// Just joined, unmuted, or back after a call.
     func micLive() {
         refresh()
         logProcessing()
         guard !prompted, settle == nil else { return }
         settle = Task { [weak self] in
-            // The mode (and Control Center's Mic Mode control) follows the engine's input once it's running.
+            // The mode (and Control Center's control) follows the engine's input only once it's running.
             try? await Task.sleep(nanoseconds: 1_500_000_000)
             guard let self, !Task.isCancelled else { return }
             self.settle = nil
@@ -75,13 +67,12 @@ final class MicMode: NSObject {
         }
     }
 
-    /// A call took the mic, or the session ended: nothing to pick a mode for until the mic is live again.
+    /// A call took the mic, or the session ended.
     func micStopped() {
         settle?.cancel(); settle = nil
         due = false
     }
 
-    /// Apple's Mic Mode picker (Control Center's module for this app).
     func show() {
         micModeLog.info("showing the picker; active=\(Self.name(self.active), privacy: .public) preferred=\(Self.name(self.preferred), privacy: .public)")
         AVCaptureDevice.showSystemUserInterface(.microphoneModes)
@@ -90,11 +81,11 @@ final class MicMode: NSObject {
     private func promptIfDue() {
         guard due, !prompted, sessionOn else { return }
         refresh()
-        if preferred == .voiceIsolation || active == .voiceIsolation {  // already chosen: iOS keeps it per app
+        if preferred == .voiceIsolation || active == .voiceIsolation {  // iOS keeps it per app
             due = false
             return
         }
-        guard UIApplication.shared.applicationState == .active else { return }  // again when the app is on screen
+        guard UIApplication.shared.applicationState == .active else { return }  // retried in appActive
         due = false
         prompted = true
         show()
@@ -113,8 +104,8 @@ final class MicMode: NSObject {
         onChange?(self)
     }
 
-    /// Mic Modes need Apple's voice processing on the input: logged so a later SDK change that moves processing
-    /// to WebRTC's software path (which has no Voice Isolation) shows up.
+    /// Mic Modes need Apple's voice processing; logged so an SDK change to WebRTC's software path (no Voice
+    /// Isolation) shows up.
     private func logProcessing() {
         Task.detached {
             let vp = AudioManager.shared.platformVoiceProcessingState

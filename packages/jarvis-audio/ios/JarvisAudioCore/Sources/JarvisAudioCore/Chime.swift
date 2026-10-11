@@ -1,17 +1,16 @@
 import Foundation
 
-/// The page's earphone cue (web/src/lib/mic.ts `chime`), as a WAV file: two short notes, falling for muted
-/// and rising for listening again. Played natively, since the page can't make a sound in the background.
+/// The page's earphone cue (web/src/lib/mic.ts `chime`) as a WAV: falling notes for muted, rising for unmuted.
+/// Played natively because the page can't make sound in the background.
 public enum Chime {
     public static let notes: (high: Double, low: Double) = (880, 587)
     static let gap = 0.1, attack = 0.01, decay = 0.08, length = 0.09, peak = 0.15, floor = 0.0001
 
-    /// The notes' frequencies, in order.
     public static func frequencies(muted: Bool) -> [Double] {
         muted ? [notes.high, notes.low] : [notes.low, notes.high]
     }
 
-    /// Samples in -1...1: each note fades in over 10 ms and out by 80 ms, like the page's exponential ramps.
+    /// Samples in -1...1, with the page's exponential ramps (in over 10 ms, out by 80 ms).
     public static func samples(muted: Bool, rate: Double = 24_000) -> [Float] {
         let total = Int((gap + length) * rate)
         var out = [Float](repeating: 0, count: total)
@@ -29,7 +28,7 @@ public enum Chime {
         return out
     }
 
-    /// A mono 16-bit PCM WAV of `samples`.
+    /// Mono 16-bit PCM.
     public static func wav(muted: Bool, rate: Int = 24_000) -> Data {
         let pcm = samples(muted: muted, rate: Double(rate)).map { Int16(max(-1, min(1, $0)) * Float(Int16.max)) }
         var d = Data()

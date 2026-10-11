@@ -1,8 +1,8 @@
 import { WebPlugin } from "@capacitor/core";
 import type { JarvisAudioPermissionStatus, JarvisAudioPlugin, SessionStatus } from "./definitions";
 
-// In a browser the page runs its own LiveKit session, so there is nothing for the plugin to do. The page
-// checks Capacitor.isNativePlatform() before using it; these only answer if something calls it anyway.
+// In a browser the page runs its own LiveKit session and checks Capacitor.isNativePlatform() before using the
+// plugin, so these only answer stray calls.
 export class JarvisAudioWeb extends WebPlugin implements Pick<JarvisAudioPlugin,
   "start" | "stop" | "setMuted" | "toggleMute" | "sendText" | "getStatus" | "getServerUrl" | "setServerUrl"
   | "clearServerUrl" | "checkPermissions" | "requestPermissions"> {

@@ -2,7 +2,6 @@ package com.anil.jarvis.audio.core
 
 import java.util.Locale
 
-/** The agent's lk.agent.state attribute, checked against the states the page knows. */
 object AgentStates {
     val known = setOf("initializing", "idle", "listening", "thinking", "speaking")
 
@@ -11,15 +10,14 @@ object AgentStates {
 }
 
 /**
- * Captions as they stream in on lk.transcription: a segment's text arrives in chunks, and the page gets the
- * whole line so far each time. A segment sent again starts over, as the page does it.
+ * Accumulates lk.transcription chunks so the page always gets the whole line so far. A segment sent again starts
+ * over, as on the page.
  */
 class Captions(private val limit: Int = 100) {
     data class Line(val id: String, val speaker: String, val text: String, val final: Boolean)
 
     private val texts = LinkedHashMap<String, String>()
 
-    /** A stream opened for segment [id]: empties the line if it was seen before. */
     fun begin(id: String) {
         texts[id] = ""
         while (texts.size > limit) texts.remove(texts.keys.first())
@@ -35,7 +33,7 @@ class Captions(private val limit: Int = 100) {
     fun text(id: String): String? = texts[id]
 
     companion object {
-        /** Who said it: our own identity is the user, anyone else (the agent) is JARVIS. The same test as the page. */
+        /** Our own identity is the user; anyone else is JARVIS. Same test as the page. */
         @JvmStatic
         fun speaker(sender: String?, local: String?): String = if (sender != null && sender == local) "you" else "jarvis"
     }

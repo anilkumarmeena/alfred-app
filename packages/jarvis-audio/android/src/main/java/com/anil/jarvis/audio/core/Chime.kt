@@ -5,8 +5,8 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * The page's earphone cue (web/src/lib/mic.ts `chime`) as 16-bit PCM: two short notes, falling for muted and
- * rising for listening again. Played natively, since the page can't make a sound in the background.
+ * The page's earphone cue (web/src/lib/mic.ts `chime`) as PCM: falling notes for muted, rising for listening.
+ * Native because the page can't play sound in the background.
  */
 object Chime {
     const val HIGH = 880.0
@@ -21,7 +21,7 @@ object Chime {
     @JvmStatic
     fun frequencies(muted: Boolean): List<Double> = if (muted) listOf(HIGH, LOW) else listOf(LOW, HIGH)
 
-    /** Samples in -1..1: each note fades in over 10 ms and out by 80 ms, like the page's exponential ramps. */
+    /** Samples in -1..1, with the page's exponential ramps (10 ms in, out by 80 ms). */
     @JvmStatic
     fun samples(muted: Boolean, rate: Int = 24_000): FloatArray {
         val total = ((GAP + LENGTH) * rate).toInt()
@@ -42,7 +42,6 @@ object Chime {
         return out
     }
 
-    /** [samples] as 16-bit PCM, for an AudioTrack. */
     @JvmStatic
     fun pcm16(muted: Boolean, rate: Int = 24_000): ShortArray =
         samples(muted, rate).map { (it.coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort() }.toShortArray()

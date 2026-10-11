@@ -3,7 +3,7 @@ import type { JarvisAudioPlugin } from "./definitions";
 
 export * from "./definitions";
 
-/** The codes start(), setServerUrl() and friends reject with, as `error.code`. */
+/** `error.code` values the plugin rejects with. */
 export const JarvisAudioError = {
   unauthorized: "UNAUTHORIZED",
   rateLimited: "RATE_LIMITED",

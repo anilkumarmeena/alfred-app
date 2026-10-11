@@ -11,7 +11,7 @@
 			<key>Title</key>
 			<string>Server</string>
 			<key>FooterText</key>
-			<string>The Mac's Tailscale address, e.g. https://your-mac.your-tailnet.ts.net. Takes effect the next time JARVIS opens: swipe it away and open it again. Leave empty to be asked.</string>
+			<string>The JARVIS computer's Tailscale address, e.g. https://your-computer.your-tailnet.ts.net. Takes effect the next time JARVIS opens: swipe it away and open it again. Leave empty to be asked.</string>
 		</dict>
 		<dict>
 			<key>Type</key>

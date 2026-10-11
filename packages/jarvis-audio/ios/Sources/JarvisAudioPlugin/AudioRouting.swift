@@ -1,13 +1,9 @@
 import AVFoundation
 import Foundation
 
-/// The app's AVAudioSession: playAndRecord for a voice chat, kept active for the whole session so iOS keeps
-/// the app running in the background (UIBackgroundModes audio), with Bluetooth headsets and AirPods allowed
-/// for both directions and the speaker, not the earpiece, when nothing is plugged in. LiveKit's own session
-/// handling is switched off (see VoiceSession), so this is the one place it's set up.
-///
-/// It also reports what happens to the session: interruptions (a phone call, Siri, an alarm), route changes
-/// (AirPods in or out) and media services resets.
+/// The only AVAudioSession setup (LiveKit's is switched off in VoiceSession). Stays active for the whole session
+/// so UIBackgroundModes audio keeps the app alive; speaker rather than earpiece when nothing is plugged in.
+/// Reports interruptions, route changes and media services resets.
 @MainActor
 final class AudioRouting {
     enum Event {
@@ -39,8 +35,8 @@ final class AudioRouting {
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    /// After an interruption, iOS leaves the session inactive until the app asks again. False while something with
-    /// a higher priority (a phone call, Siri) still holds the audio.
+    /// iOS leaves the session inactive after an interruption until asked. False while a higher-priority client
+    /// (call, Siri) still holds the audio.
     @discardableResult
     func reactivate() -> Bool {
         do { try session.setActive(true); return true } catch {
@@ -49,7 +45,7 @@ final class AudioRouting {
         }
     }
 
-    /// What's in use now, e.g. ("AirPods Pro", "AirPods Pro") or ("Speaker", "iPhone Microphone").
+    /// e.g. ("AirPods Pro", "AirPods Pro") or ("Speaker", "iPhone Microphone").
     var route: (output: String, input: String?) {
         let r = session.currentRoute
         return (r.outputs.first?.portName ?? "Speaker", r.inputs.first?.portName)

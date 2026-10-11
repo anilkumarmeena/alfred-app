@@ -1,6 +1,5 @@
 #!/bin/sh
-# Builds the iOS app for the simulator without signing, to check that everything compiles:
-# npm run build:ios-sim. Build output goes in .build/ (DerivedData and SwiftPM checkouts).
+# Unsigned simulator build of the iOS app, to check it compiles (npm run build:ios-sim). Output goes in .build/.
 set -e
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root/ios/App"

@@ -4,23 +4,21 @@ import os
 
 let muteLog = Logger(subsystem: "com.anil.jarvis", category: "mute")
 
-/// The AirPods stem press (and some Beats) on iOS 17+: the system's mute gesture (Press to Mute). During a
-/// playAndRecord session iOS mutes or unmutes the app's input itself on a stem press, and says so with
-/// AVAudioApplication.inputMuteStateChangeNotification. Adding an observer for that notification is what opts the
-/// app in: iOS hooks it and marks each of the app's audio sessions that exists at that moment as wanting the
-/// gesture (PrefersBluetoothAccessoryMuting). A session created later starts unmarked, and a stem press on it
-/// gets "Cannot control mic with AirPods". So the observer is added when this is created and again, by optIn(),
-/// once the mic is recording and every session the engine uses exists. VoiceSession ignores it with no session.
+/// AirPods (and some Beats) stem-press mute. During playAndRecord iOS mutes the input itself and posts
+/// inputMuteStateChangeNotification. Adding that observer is what opts in: iOS marks every audio session that
+/// exists at that moment (PrefersBluetoothAccessoryMuting). A session created later stays unmarked and a press
+/// gets "Cannot control mic with AirPods", so optIn() re-adds the observer once the mic is recording and all the
+/// engine's sessions exist.
 @MainActor
 final class AirPodsMute {
     /// iOS has already muted or unmuted the input.
     var onPress: ((_ muted: Bool) -> Void)?
     private var observer: NSObjectProtocol?
-    private var echo: Bool?  // what setSystemMuted just gave iOS: its notification comes back and is dropped
+    private var echo: Bool?  // set by setSystemMuted so its own notification is dropped
 
     init() { optIn() }
 
-    /// (Re)adds the mute-state observer, which (re)opts every audio session the app has now into the AirPods gesture.
+    /// Re-adding the observer opts in every audio session that exists now.
     func optIn() {
         if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = NotificationCenter.default.addObserver(
@@ -43,15 +41,14 @@ final class AirPodsMute {
         if !isEcho { onPress?(muted) }
     }
 
-    /// The input route, for the log: BluetoothHFP is AirPods (or another headset's mic), MicrophoneBuiltIn the phone.
+    /// For logs: BluetoothHFP is a headset mic, MicrophoneBuiltIn the phone.
     static var inputRoute: String {
         let inputs = AVAudioSession.sharedInstance().currentRoute.inputs
         return inputs.isEmpty ? "none" : inputs.map { "\($0.portType.rawValue) (\($0.portName))" }.joined(separator: ", ")
     }
 
-    /// Keeps the system's input mute in step with the app's, taps on the screen included, so the next stem press
-    /// goes the right way and iOS's mute (which silences the input itself) never outlasts an unmute or the
-    /// session. The notification iOS sends back for it is dropped as an echo.
+    /// Mirrors the app's mute (screen taps included) into iOS, so the next stem press goes the right way and the
+    /// system mute, which silences the input itself, never outlasts an unmute or the session.
     func setSystemMuted(_ muted: Bool) {
         let was = AVAudioApplication.shared.isInputMuted
         muteLog.info("setInputMuted \(muted, privacy: .public) (was \(was, privacy: .public)) input=\(Self.inputRoute, privacy: .public)")

@@ -6,9 +6,7 @@ import os
 
 private let log = Logger(subsystem: "com.anil.jarvis", category: "liveactivity")
 
-/// The Live Activity on the lock screen, in the Dynamic Island and on Apple Watch while a session runs: what
-/// JARVIS is doing, how long the session has been going, and Mute/Unmute and Hang Up buttons (JarvisWidget
-/// draws it). It follows SessionControls and ends with the session.
+/// Drives the session's Live Activity (drawn by JarvisWidget) from SessionControls; ends with the session.
 @MainActor
 final class SessionActivity {
     static let shared = SessionActivity()
@@ -27,16 +25,15 @@ final class SessionActivity {
             }
         }
         SessionControls.onChange = { [weak self] in self?.show($0, startedAt: $1) }
-        // Left over from a launch that was killed mid-session: no session is running now. Listed here, before
-        // any session can start, so a new session's activity is never among them.
+        // Leftovers from a launch killed mid-session. Ended here, before any session can start, so a new
+        // session's activity is never among them.
         for a in Activity<JarvisActivityAttributes>.activities {
             Task { await a.end(nil, dismissalPolicy: .immediate) }
         }
     }
 
-    /// The app is being quit (swiped away in the app switcher; a session keeps it running in the background, so
-    /// iOS says so first). iOS leaves a quit app's Live Activities up, so end the card before the process goes,
-    /// waiting up to two seconds. A crash or a kill without warning leaves it until the next launch.
+    /// iOS leaves a quit app's Live Activities up, so end them before the process goes (blocks up to 2 s).
+    /// A crash or kill without warning leaves the card until the next launch.
     static nonisolated func endBeforeQuit() {
         let done = DispatchSemaphore(value: 0)
         Task.detached {
@@ -61,8 +58,7 @@ final class SessionActivity {
                 await a.update(content)
             }
         } else if !dismissed, ActivityAuthorizationInfo().areActivitiesEnabled {
-            // Only allowed with the app on screen, which it is when a session starts; if it isn't, the next
-            // change tries again.
+            // Only allowed while the app is in the foreground; if it isn't, the next change retries.
             do {
                 activity = try Activity.request(attributes: JarvisActivityAttributes(), content: content)
             } catch {

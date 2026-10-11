@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["capacitor.config.ts", "shell/*.js", "web-hook/*.ts", "tests"]
+  "include": ["capacitor.config.ts", "shell/*.js"]
 }

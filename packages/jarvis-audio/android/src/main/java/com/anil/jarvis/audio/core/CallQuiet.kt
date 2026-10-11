@@ -1,20 +1,19 @@
 package com.anil.jarvis.audio.core
 
 /**
- * A phone call turns JARVIS's mic and speaker off, so nothing of the call is heard by JARVIS and JARVIS says nothing
- * over it. When the call ends, the user is offered the mic and the speaker back as they were before it, if that's any
- * different; VoiceSession asks the page, which shows the offer. The same rules as the iOS side's CallQuiet.swift.
+ * A phone call turns the mic and speaker off; when it ends, the user is offered the previous state back if it
+ * differs (the page shows the offer). Same rules as iOS CallQuiet.swift.
  */
 class CallQuiet {
     data class State(val muted: Boolean, val speakerOff: Boolean)
 
-    private var before: State? = null  // as it was when the call came in, until it ends
+    private var before: State? = null  // state when the call began
 
-    /** What to offer to put back, from the end of the call until the user answers or changes either themselves. */
+    /** Open from the call's end until the user answers or changes the mic or speaker themselves. */
     var offer: State? = null
         private set
 
-    /** A call is ringing or on, as the session is [now]. True the first time, when the mic and speaker go off. */
+    /** A call is ringing or on. True only the first time, when the mic and speaker should go off. */
     fun began(now: State): Boolean {
         offer = null
         if (before != null) return false
@@ -22,7 +21,7 @@ class CallQuiet {
         return true
     }
 
-    /** The call ended, leaving the session [now]: what to offer to put back, or null if it's as it was before. */
+    /** The call ended: the state to offer back, or null if nothing changed. */
     fun ended(now: State): State? {
         val was = before ?: return null
         before = null
@@ -30,6 +29,6 @@ class CallQuiet {
         return offer
     }
 
-    /** The user answered the offer, or set the mic or speaker themselves: the offer is closed. Returns it, if open. */
+    /** Closes the offer and returns it, if open. */
     fun settle(): State? = offer.also { offer = null }
 }

@@ -1,8 +1,8 @@
 import CallKit
 import Foundation
 
-/// Phone calls on the iPhone, and other apps' CallKit calls (FaceTime, WhatsApp…), for VoiceSession: `onChange` says
-/// whether any call is ringing, dialling or on, each time that changes. CXCallObserver needs no permission.
+/// Reports whether any CallKit call (phone, FaceTime, WhatsApp…) is ringing, dialling or on. CXCallObserver needs
+/// no permission.
 @MainActor
 final class CallWatch: NSObject, CXCallObserverDelegate {
     var onChange: ((Bool) -> Void)?

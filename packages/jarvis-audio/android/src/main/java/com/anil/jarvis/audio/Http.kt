@@ -6,9 +6,8 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** jarvis.web's JSON API: POSTs [body] and gives back the status and the reply's JSON object (null if it has none). */
 internal object Http {
-    /** Throws IOException when the Mac can't be reached. */
+    /** The status and the reply's JSON object (null if none). Throws IOException when the JARVIS computer can't be reached. */
     suspend fun post(url: String, body: Map<String, String>): Pair<Int, JSONObject?> = withContext(Dispatchers.IO) {
         val c = URL(url).openConnection() as HttpURLConnection
         try {
@@ -25,6 +24,5 @@ internal object Http {
         }
     }
 
-    /** A string field of a reply, or null if it has none. */
     fun field(json: JSONObject?, key: String): String? = json?.takeIf { it.has(key) }?.optString(key)
 }

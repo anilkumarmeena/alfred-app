@@ -19,14 +19,10 @@ import kotlinx.coroutines.launch
 import java.io.IOException
 
 /**
- * JARVIS's notifications in the app: heartbeat alerts and background tasks that finish, fail or have a question.
- * The page's Web Push doesn't work in an app's web view, so the app registers with Firebase Cloud Messaging itself
- * and hands the token to jarvis.web (/api/push/native) whenever a voice session starts, when it has the passcode.
- * The Mac sends data messages, which [JarvisMessagingService] gets even with the app closed and shows here; tapping
- * one opens its page (/?task=3) on the JARVIS server. The iOS side does the same with APNs.
+ * JARVIS's alerts via FCM, since Web Push doesn't work in a web view. The token goes to jarvis.web on each session
+ * start (that's when the passcode is known); a tap opens the alert's page on the saved server.
  *
- * Needs the app built with a google-services.json (a Firebase project); without one Firebase isn't set up, and this
- * logs that once and does nothing. Everything here runs on the main thread.
+ * Needs a google-services.json at build time; without one it logs and does nothing. Main thread only.
  */
 object PushNotifications {
     private const val TAG = "JarvisAudio"
@@ -41,7 +37,7 @@ object PushNotifications {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var app: Context
 
-    /** Loads a page in the web view: set by the plugin once the bridge is up. A tap before that waits for it. */
+    /** Set by the plugin once the bridge is up; a tap before that is held until then. */
     var open: ((String) -> Unit)? = null
         set(value) {
             field = value
@@ -50,27 +46,24 @@ object PushNotifications {
         }
     private var pending: String? = null
 
-    private var target: Target? = null  // where the token goes: the latest session's server and passcode
+    private var target: Target? = null  // the latest session's server and passcode
     private var token: String? = null
-    private var sent: Target? = null  // the target the current token was last handed to
+    private var sent: Target? = null  // where the current token was last accepted
     private var sending = false
 
-    /** Asks Firebase for the token, which goes to the server once it comes. */
     fun register(context: Context, server: ServerAddress, passcode: String, device: String) {
         app = context.applicationContext
         target = Target(server, passcode, device)
         val messaging = try { FirebaseMessaging.getInstance() } catch (e: IllegalStateException) {
-            // No google-services.json in the build: Firebase never started.
             Log.i(TAG, "notifications: the app was built without a Firebase project (google-services.json)")
             return
         }
-        // Every time: the token can change, and Firebase answers quickly with the current one.
+        // Every time: the token can change, and Firebase answers quickly.
         messaging.token.addOnCompleteListener { t ->
             if (t.isSuccessful && t.result != null) tokenChanged(t.result) else Log.w(TAG, "notifications: no FCM token", t.exception)
         }
     }
 
-    /** A new token from Firebase ([JarvisMessagingService.onNewToken]), or the current one. */
     fun tokenChanged(t: String) {
         main.post {
             if (t != token) { token = t; sent = null }
@@ -78,8 +71,7 @@ object PushNotifications {
         }
     }
 
-    /** Hands the token over, unless this server already has it from this launch. A refusal or a network failure is
-     * tried again when the next session starts. */
+    /** Skipped if this server already has it from this launch; failures retry on the next session start. */
     private fun send() {
         val token = token ?: return
         val target = target ?: return
@@ -96,7 +88,7 @@ object PushNotifications {
                 Log.w(TAG, "notification token: ${e.message}")
             } finally {
                 sending = false
-                if (this@PushNotifications.target != target) send()  // a new session, maybe with another server, started meanwhile
+                if (this@PushNotifications.target != target) send()  // a new session started meanwhile
             }
         }
     }
@@ -104,8 +96,8 @@ object PushNotifications {
     // --- Showing them ---
 
     /**
-     * Shows a push from the Mac: {title, body, url, tag, subtitle}. A newer one with the same tag replaces the older
-     * one, as on Web Push and APNs. Called on Firebase's thread, with the app maybe not on screen or not running.
+     * Shows {title, body, url, tag, subtitle}; a newer push with the same tag replaces the older, as on Web Push and
+     * APNs. Called on Firebase's thread, possibly with the app not running.
      */
     fun show(context: Context, data: Map<String, String>) {
         val ctx = context.applicationContext
@@ -147,12 +139,12 @@ object PushNotifications {
 
     // --- Tapping them ---
 
-    /** The activity was started or brought back by a tap on one of [show]'s notifications: open its page. */
+    /** Opens the page of a tapped [show] notification, if [intent] carries one. */
     fun tapped(context: Context, intent: Intent?) {
         val url = intent?.getStringExtra(EXTRA_URL) ?: return
         val title = intent.getStringExtra(EXTRA_TITLE)
         val body = intent.getStringExtra(EXTRA_BODY)
-        intent.removeExtra(EXTRA_URL)  // once: recreating the activity mustn't open it again
+        intent.removeExtra(EXTRA_URL)  // recreating the activity mustn't open it again
         if (ServerSettings.showingSetup(context)) return
         val page = ServerSettings.current(context)?.page(url, title, body) ?: return  // only ever the saved server
         open?.invoke(page) ?: run { pending = page }

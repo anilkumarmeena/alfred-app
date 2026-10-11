@@ -1,6 +1,6 @@
 #!/bin/sh
-# The Swift unit tests without SwiftPM: swiftc builds JarvisAudioCore and an XCTest bundle, and xctest runs it.
-# For machines or sandboxes where `swift test` can't write its build folder. OUT (default .build/direct) holds the build.
+# The Swift unit tests without SwiftPM (swiftc builds JarvisAudioCore and an XCTest bundle, xctest runs it), for
+# where `swift test` can't write its build folder. $1: build dir (default .build/direct).
 set -e
 root="$(cd "$(dirname "$0")/.." && pwd)"
 core="$root/packages/jarvis-audio/ios/JarvisAudioCore"

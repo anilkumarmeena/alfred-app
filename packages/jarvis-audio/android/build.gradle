@@ -1,4 +1,4 @@
-// The JarvisAudio plugin's Android library. `npx cap sync` includes it in the app as :jarvis-audio.
+// The JarvisAudio plugin's Android library; `npx cap sync` adds it to the app as :jarvis-audio.
 ext {
     junitVersion = project.hasProperty('junitVersion') ? rootProject.ext.junitVersion : '4.13.2'
     livekitVersion = project.hasProperty('livekitVersion') ? rootProject.ext.livekitVersion : '2.29.0'
@@ -49,7 +49,7 @@ dependencies {
     implementation "androidx.appcompat:appcompat:${project.hasProperty('androidxAppCompatVersion') ? rootProject.ext.androidxAppCompatVersion : '1.7.0'}"
     implementation "io.livekit:livekit-android:$livekitVersion"
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
-    // JARVIS's alerts (PushNotifications). Starts only in an app built with a google-services.json.
+    // PushNotifications; Firebase starts only in an app built with a google-services.json.
     implementation "com.google.firebase:firebase-messaging:${project.hasProperty('firebaseMessagingVersion') ? rootProject.ext.firebaseMessagingVersion : '24.1.0'}"
     testImplementation "junit:junit:$junitVersion"
 }

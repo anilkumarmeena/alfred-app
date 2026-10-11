@@ -6,28 +6,26 @@ import java.net.URLEncoder
 import java.util.Locale
 
 /**
- * The JARVIS web app's address, as typed on the first-run page: `mac.tailnet.ts.net`,
- * `https://mac.tailnet.ts.net/`, `http://10.0.2.2:8787`. Reduced to its origin, since the page lives at `/`.
- * The same rules as the iOS side's ServerAddress.swift.
+ * The JARVIS address typed on the first-run page (`mac.tailnet.ts.net`, `http://10.0.2.2:8787`…), reduced to its
+ * origin. Same rules as iOS ServerAddress.swift.
  */
 class ServerAddress private constructor(val origin: String, val host: String, val isCleartext: Boolean) {
 
     sealed class Problem(message: String) : IllegalArgumentException(message) {
         object Empty : Problem("Enter JARVIS's address.")
         class UnsupportedScheme(val scheme: String) : Problem("$scheme:// isn't a web address. Use https://.")
-        object NoHost : Problem("That doesn't look like an address. Try https://your-mac.your-tailnet.ts.net.")
+        object NoHost : Problem("That doesn't look like an address. Try https://your-computer.your-tailnet.ts.net.")
     }
 
-    /** jarvis.web's token endpoint: POST {"passcode", "device"} → {"token", "url"}. */
+    /** POST {"passcode", "device"} → {"token", "url"}. */
     val tokenUrl: String get() = "$origin/api/token"
 
-    /** Where the app hands jarvis.web its FCM token: POST {"passcode", "device", "token", "service", "topic"}. */
+    /** POST {"passcode", "device", "token", "service", "topic"}. */
     val pushUrl: String get() = "$origin/api/push/native"
 
     /**
-     * The page a notification opens when tapped: its `url`, such as /?task=3, on this server, with its title and
-     * body after the # as the page's service worker puts them (#title=…&body=…). Null for a URL on another host, so
-     * a notification can't point the web view somewhere else.
+     * A tapped notification's page on this server, with title and body in the # as the service worker puts them.
+     * Null for any other origin, so a notification can't point the web view elsewhere.
      */
     fun page(url: String, title: String? = null, body: String? = null): String? {
         val base = URI(origin)
@@ -59,11 +57,10 @@ class ServerAddress private constructor(val origin: String, val host: String, va
             return ServerAddress("$scheme://$authority${port?.let { ":$it" } ?: ""}", host, scheme == "http")
         }
 
-        /** parse(), or null for anything it refuses. */
         @JvmStatic
         fun parseOrNull(text: String?): ServerAddress? = text?.let { runCatching { parse(it) }.getOrNull() }
 
-        // The page reads the # with URLSearchParams, where a plain + is a space: spaces go as %20 and a + as %2B.
+        // The page reads the # with URLSearchParams, where + means space.
         private fun formEncode(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
     }
 }

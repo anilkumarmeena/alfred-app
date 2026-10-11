@@ -10,8 +10,8 @@ public enum AgentStates {
     }
 }
 
-/// Captions as they stream in on lk.transcription: a segment's text arrives in chunks, and the page gets the
-/// whole line so far each time. A segment sent again starts over, as the page does it.
+/// lk.transcription segments arrive in chunks; the page gets the whole line so far each time. A resent segment
+/// starts over, matching the page.
 public struct Captions: Sendable {
     public struct Line: Equatable, Sendable {
         public let id: String
@@ -28,7 +28,7 @@ public struct Captions: Sendable {
         self.limit = limit
     }
 
-    /// A stream opened for segment `id`: empties the line if it was seen before.
+    /// Empties the line if `id` was seen before.
     public mutating func begin(id: String) {
         if texts[id] == nil { order.append(id) }
         texts[id] = ""
@@ -44,7 +44,7 @@ public struct Captions: Sendable {
 
     public func text(id: String) -> String? { texts[id] }
 
-    /// Who said it: our own identity is the user, anyone else (the agent) is JARVIS. The same test as the page.
+    /// Same test as the page: our own identity is the user, anyone else is JARVIS.
     public static func speaker(sender: String?, local: String?) -> String {
         sender != nil && sender == local ? "you" : "jarvis"
     }

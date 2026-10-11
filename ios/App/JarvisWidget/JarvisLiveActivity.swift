@@ -4,9 +4,7 @@ import JarvisAudioCore
 import SwiftUI
 import WidgetKit
 
-/// The session on the lock screen, in the Dynamic Island and on Apple Watch (the Smart Stack): JARVIS, what
-/// it's doing, the session's running time, and Mute/Unmute and Hang Up buttons. Tapping anywhere else opens the
-/// app. A button tapped on the watch runs on the iPhone.
+/// Lock screen, Dynamic Island and Apple Watch Smart Stack. Watch button taps run on the iPhone.
 struct JarvisLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: JarvisActivityAttributes.self) { context in
@@ -37,11 +35,10 @@ struct JarvisLiveActivity: Widget {
             }
             .keylineTint(.cyan)
         }
-        .supplementalActivityFamilies([.small])  // the watch's own layout, not the Dynamic Island's compact pieces
+        .supplementalActivityFamilies([.small])  // a watch layout instead of the Dynamic Island's compact pieces
     }
 }
 
-/// The lock screen's card (medium), or the watch's (small).
 private struct ActivityView: View {
     let state: JarvisActivityAttributes.ContentState
     @Environment(\.activityFamily) private var family
@@ -54,7 +51,6 @@ private struct ActivityView: View {
     }
 }
 
-/// The Smart Stack card: JARVIS and the running time on top, the status and both buttons below.
 private struct WatchView: View {
     let state: JarvisActivityAttributes.ContentState
 
@@ -96,7 +92,7 @@ private struct LockScreenView: View {
     }
 }
 
-/// "Listening · 4:12": the status, then the time since the room was first joined.
+/// "Listening · 4:12", timed from the first join.
 private struct StatusLine: View {
     let state: JarvisActivityAttributes.ContentState
 
@@ -125,14 +121,13 @@ private struct Elapsed: View {
     }
 }
 
-/// What JARVIS is doing, never a mic: the mic is the Mute button's, so the two can't be mistaken for each other.
+/// Never a mic symbol, so it can't be mistaken for the Mute button.
 private struct PhaseIcon: View {
     let state: JarvisActivityAttributes.ContentState
 
     var body: some View {
         Image(systemName: symbol)
             .foregroundStyle(color)
-            // The speaker's waves pulse while JARVIS talks, and one state's symbol morphs into the next.
             .symbolEffect(.variableColor.iterative.dimInactiveLayers, options: .repeat(.continuous), isActive: state.summary.phase == .speaking)
             .contentTransition(.symbolEffect(.replace))
     }
@@ -158,9 +153,7 @@ private struct PhaseIcon: View {
     }
 }
 
-/// Mute/Unmute and Hang Up. They run in the app (LiveActivityIntent), which is alive for the whole session.
-/// Mute shows the mic's state: a mic on a translucent pill while JARVIS hears you, struck out on solid orange
-/// while muted.
+/// LiveActivityIntents run in the app, which is alive for the whole session.
 private struct Buttons: View {
     let state: JarvisActivityAttributes.ContentState
     var compact = false

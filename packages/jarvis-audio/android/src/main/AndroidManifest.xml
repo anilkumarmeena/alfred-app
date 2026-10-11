@@ -1,20 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Merged into the app's manifest. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    <!-- Bluetooth headsets: routing the call audio to them (Android 12+ asks for this one at runtime via AudioSwitch). -->
+    <!-- Routing call audio to Bluetooth headsets; BLUETOOTH_CONNECT is asked for at runtime on Android 12+. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- The mic keeps running with the screen off or another app in front: a microphone foreground service. -->
+    <!-- Microphone foreground service, so the mic runs with the screen off or another app in front. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
-    <!-- Android 13+: the ongoing-session notification, and JARVIS's alerts. -->
+    <!-- Android 13+: the session notification and alerts. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Android 16: the session's notification as a Live Update (top of the lock screen, a status bar chip). -->
+    <!-- Android 16: the session notification as a Live Update (lock screen top, status bar chip). -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
     <application>
@@ -23,7 +22,7 @@
             android:exported="false"
             android:foregroundServiceType="microphone" />
 
-        <!-- JARVIS's alerts through Firebase Cloud Messaging (PushNotifications), with the app closed too. -->
+        <!-- FCM alerts (PushNotifications), also with the app closed. -->
         <service
             android:name="com.anil.jarvis.audio.JarvisMessagingService"
             android:exported="false">
@@ -31,7 +30,7 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-        <!-- For notification messages Android shows itself (the Mac sends data messages, which the app shows). -->
+        <!-- Only for notification messages Android shows itself; JARVIS sends data messages. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="jarvis_alerts" />

@@ -5,19 +5,16 @@ import LiveKit
 import Network
 import UIKit
 
-/// JARVIS's voice session, run natively: the same LiveKit room the page would join (a token from jarvis.web's
-/// /api/token, then the agent's room), with the mic, JARVIS's voice, captions, agent state and typed messages.
-/// With UIBackgroundModes audio and the audio session kept active, it keeps going with the screen locked or
-/// the app in the background, where the web page is suspended. It's a singleton so a reloaded page (or a
-/// relaunched bridge) finds the running session with getStatus. The plugin forwards what happens to the page.
+/// The LiveKit session the page would otherwise join, run natively so it survives the screen lock and background
+/// (where the web page is suspended). A singleton so a reloaded page or relaunched bridge finds it via getStatus.
 @MainActor
 final class VoiceSession: NSObject {
     static let shared = VoiceSession()
 
     struct Failure: Error {
-        let code: String  // one of the codes in the plugin's TypeScript definitions
+        let code: String  // as in the plugin's TypeScript definitions
         let message: String
-        var retryable = false  // a hiccup worth retrying without the user, not a refusal
+        var retryable = false  // a hiccup, not a refusal
     }
 
     private struct Wanted: Equatable {
@@ -29,18 +26,18 @@ final class VoiceSession: NSObject {
     private static let transcription = "lk.transcription", chat = "lk.chat"
     private nonisolated static let agentStateKey = "lk.agent.state"  // read in the RoomDelegate callbacks too
     private static let segmentKey = "lk.segment_id"
-    private static let speakerKey = "jarvis.speaker"  // our attribute: "off" and the agent makes no speech at all
+    private static let speakerKey = "jarvis.speaker"  // "off": the agent makes no speech at all
 
-    /// Every event for the page: a name from definitions.ts and its data.
+    /// Event names from definitions.ts.
     var onEvent: ((String, [String: Any]) -> Void)?
 
-    // What the session should be: set from start() until it ends. `generation` changes whenever it does, so
-    // work begun for an older session (a token fetch, a retry) drops its result.
+    // Set from start() until the session ends. `generation` bumps with it, so async work from an older session
+    // (token fetch, retry) drops its result.
     private var wanted: Wanted?
     private var generation = 0
 
     private var room: Room?
-    private var leaving: DisconnectCause?  // set when the agent left, so the room ending isn't retried
+    private var leaving: DisconnectCause?  // set when the agent left, so the disconnect isn't retried
     private var outbox: [String] = []
     private var captions = Captions()
     private let policy = ReconnectPolicy()
@@ -48,32 +45,32 @@ final class VoiceSession: NSObject {
     private var retryTask: Task<Void, Never>?
     private var levelsTask: Task<Void, Never>?
     private var path: NWPathMonitor?
-    private var sync = MicSync()  // keeps the mic track and the mute / interruption the page shows in step
-    private var switching = 0  // mic track switches in flight: the room's reports of them aren't news
+    private var sync = MicSync()
+    private var switching = 0  // our own mic track switches in flight; the room's reports of them aren't news
     private let routing = AudioRouting()
     private let airpods = AirPodsMute()
     private let chime = ChimePlayer()
     private let calls = CallWatch()
-    private var callQuiet = CallQuiet()  // a call turns the mic and speaker off, and offers them back after
+    private var callQuiet = CallQuiet()
     let micMode = MicMode()
 
     private(set) var connection = "disconnected"
     private(set) var agentState: String?
     private(set) var muted = false
-    /// Speaker off: JARVIS replies only in the transcript. The agent makes no speech (told in the token, then by our
-    /// participant attribute), and its track plays at volume 0, so a reply already being spoken stops at once.
+    /// Transcript-only replies. The agent is told (token, then participant attribute) and its track also plays at
+    /// volume 0, so a reply already being spoken stops at once.
     private(set) var speakerOff = false
-    private(set) var interrupted = false  // a call, Siri or an alarm has the audio for now
+    private(set) var interrupted = false  // a call, Siri or an alarm holds the audio
     private(set) var startedAt: Date?
     var active: Bool { wanted != nil }
-    private var agentReady: Bool { agentState != nil && agentState != "initializing" }  // lk.chat reaches it
+    private var agentReady: Bool { agentState != nil && agentState != "initializing" }  // lk.chat would reach it
 
     override private init() {
         super.init()
-        // This file owns the AVAudioSession (AudioRouting); LiveKit only runs the engine.
+        // AudioRouting owns the AVAudioSession; LiveKit only runs the engine.
         AudioManager.shared.audioSession.isAutomaticConfigurationEnabled = false
-        // Muting silences the input without stopping the engine, so the app stays alive in the background and
-        // iOS plays no sound of its own; the chime is ours.
+        // Mute without stopping the engine, so the app stays alive in the background and iOS plays no sound of
+        // its own (the chime is ours).
         try? AudioManager.shared.set(microphoneMuteMode: .inputMixer)
         routing.onEvent = { [weak self] in self?.audioEvent($0) }
         airpods.onPress = { [weak self] in self?.airpodsPressed($0) }
@@ -95,9 +92,9 @@ final class VoiceSession: NSObject {
 
     private func emit(_ name: String, _ data: [String: Any]) { onEvent?(name, data) }
 
-    // MARK: - Starting and ending
+    // MARK: - Start and end
 
-    /// Joins, or re-reports a session that's already running with the same settings (the page reloaded).
+    /// Re-reports a running session with the same settings (the page reloaded) instead of rejoining.
     func start(server: ServerAddress, passcode: String, device: String, muted startMuted: Bool, speakerOff startSilent: Bool) async throws -> [String: Any] {
         let w = Wanted(server: server, passcode: passcode, device: device)
         if wanted == w, connection != "disconnected" { return status() }
@@ -116,10 +113,9 @@ final class VoiceSession: NSObject {
         speakerOff = startSilent
         sync = MicSync()
         micMode.sessionStarted()
-        // With iOS's mute matching ours before the engine opens the mic. (micOn opts the recording session in to
-        // the AirPods gesture.)
+        // Match iOS's mute to ours before the engine opens the mic.
         airpods.setSystemMuted(muted)
-        // Keep the audio engine running between rooms too, so a reconnect in the background isn't suspended.
+        // Keep the engine running between rooms, so iOS doesn't suspend a background reconnect.
         try? await AudioManager.shared.setRecordingAlwaysPreparedMode(true)
         watchNetwork()
         do {
@@ -136,17 +132,16 @@ final class VoiceSession: NSObject {
         end(reason: "hangup", message: nil)
     }
 
-    /// Back to no session: leave the room, stop retrying, give the audio session back.
     private func end(reason: String, message: String?, quiet: Bool = false) {
         wanted = nil
         generation += 1
         retryTask?.cancel(); retryTask = nil
-        if let r = room { drop(r) }  // the levels loop stops by itself once there's no room
+        if let r = room { drop(r) }  // the levels loop stops itself with no room
         path?.cancel(); path = nil
         connection = "disconnected"; agentState = nil; muted = false; interrupted = false; startedAt = nil
         callQuiet = CallQuiet()
         attempt = 0; outbox.removeAll()
-        airpods.setSystemMuted(false)  // stored across sessions otherwise
+        airpods.setSystemMuted(false)  // iOS keeps it across sessions otherwise
         summaryChanged()
         micMode.sessionEnded()
         Task {
@@ -176,7 +171,7 @@ final class VoiceSession: NSObject {
         }
     }
 
-    // MARK: - Joining
+    // MARK: - Join
 
     private func join(_ gen: Int, first: Bool) async throws {
         guard let w = wanted else { return }
@@ -196,17 +191,17 @@ final class VoiceSession: NSObject {
             throw Failure(code: "SERVER", message: "Couldn't join the session: \(error.localizedDescription)", retryable: true)
         }
         guard gen == generation, room === r else { return }
-        for p in r.remoteParticipants.values where p.kind == .agent { agentChanged(p.attributes[Self.agentStateKey]) }  // there before us
+        for p in r.remoteParticipants.values where p.kind == .agent { agentChanged(p.attributes[Self.agentStateKey]) }  // joined before us
         if !muted, !interrupted, !(await micOn(r, true)) {
             throw Failure(code: "NO_MICROPHONE", message: "The microphone couldn't start. Allow it for JARVIS in Settings, then try again.")
         }
-        if muted || interrupted { airpods.optIn() }  // micOn does it otherwise; a muted start can still unmute from the stem
+        if muted || interrupted { airpods.optIn() }  // else micOn does; a muted start must still unmute from the stem
         attempt = 0
         if startedAt == nil { startedAt = Date() }
         setConnection("connected", reason: nil)
         startLevels()
-        await applyMic()  // a mute while it joined
-        await tellSpeaker(r)  // and the speaker
+        await applyMic()  // changes made while joining
+        await tellSpeaker(r)
     }
 
     private func fetchToken(_ w: Wanted) async throws -> Grant {
@@ -232,8 +227,8 @@ final class VoiceSession: NSObject {
         do {
             try await r.localParticipant.setMicrophone(enabled: on)
             if on {
-                airpods.optIn()  // now that it's recording, so the AirPods stem can mute this session
-                micMode.micLive()  // and Control Center offers Mic Mode: open it if Voice Isolation isn't chosen
+                airpods.optIn()  // the recording session exists only now
+                micMode.micLive()
             }
             return true
         } catch {
@@ -242,7 +237,7 @@ final class VoiceSession: NSObject {
         }
     }
 
-    // MARK: - The room (RoomDelegate callbacks, hopped onto the main actor)
+    // MARK: - Room (RoomDelegate callbacks, hopped onto the main actor)
 
     private func roomLost(_ r: Room, error: LiveKitError?) {
         guard room === r else { return }
@@ -261,11 +256,11 @@ final class VoiceSession: NSObject {
         switch cause {
         case .agentLeft: end(reason: "agentLeft", message: "JARVIS ended the session. Tap the core to reconnect.")
         case .clientInitiated: end(reason: "hangup", message: nil)
-        default: end(reason: "server", message: "The session was closed on the Mac. Tap the core to reconnect.")
+        default: end(reason: "server", message: "The session was closed on the JARVIS computer. Tap the core to reconnect.")
         }
     }
 
-    // MARK: - Reconnecting: a fresh token and a fresh room, until it works or the session is no longer wanted
+    // MARK: - Reconnect: fresh token and room, until it works or the session is no longer wanted
 
     private func retryLater() {
         attempt += 1
@@ -292,7 +287,7 @@ final class VoiceSession: NSObject {
         }
     }
 
-    /// Back online while waiting to retry: go now rather than at the end of the wait.
+    /// Back online while waiting to retry: go now.
     private func watchNetwork() {
         guard path == nil else { return }
         let monitor = NWPathMonitor()
@@ -320,7 +315,7 @@ final class VoiceSession: NSObject {
         summaryChanged()
     }
 
-    // MARK: - The agent, captions and typed messages
+    // MARK: - Agent, captions and typed messages
 
     private func agentChanged(_ value: String?) {
         guard let state = AgentStates.parse(value) else { return }
@@ -368,24 +363,22 @@ final class VoiceSession: NSObject {
         }
     }
 
-    // MARK: - The mic
+    // MARK: - Mic
 
     @discardableResult
     func setMuted(_ m: Bool, source: String) async throws -> Bool {
         try requireSession()
-        if source != "call" { callQuiet.settle() }  // the user chose: no offer to put it back after a call
+        if source != "call" { callQuiet.settle() }  // the user chose: drop the post-call offer
         muted = m
         sync.changed(at: Self.now)
-        // iOS is told about every change, taps on the screen included, so it agrees with the app and the next stem
-        // press goes the right way. The notification it sends back is dropped as an echo (AirPodsMute).
+        // Every change, screen taps included, so the next stem press goes the right way.
         airpods.setSystemMuted(m)
-        // Unmuting from the screen while a call or Siri seems to hold the audio: if iOS hands it back, that's over.
+        // Unmuting during an apparent interruption: if iOS hands the audio back, it's over.
         if !m, interrupted, source == "user" { takeAudioBack("unmuted") }
-        // The track follows now, a mute during a call included. With no room yet (reconnecting), join and
-        // roomDidReconnect apply it; an unmute during a call is applied when the call is over.
+        // With no room (reconnecting), join and roomDidReconnect apply it; an unmute during a call waits for its end.
         let opened = await applyMic()
         if !opened, !m {
-            muted = true  // couldn't open the mic: stay muted and say so
+            muted = true  // couldn't open the mic: stay muted
             sync.changed(at: Self.now)
             airpods.setSystemMuted(true)
             emit("mute", ["muted": true, "source": "system"])
@@ -397,22 +390,21 @@ final class VoiceSession: NSObject {
         return m
     }
 
-    /// The AirPods gesture: iOS has muted or unmuted the input already (and played its own tone), so the app
-    /// follows iOS's state. Echoes of our own setSystemMuted never get here.
+    /// iOS has already switched the input (and played its tone); the app follows. Our own echoes never get here.
     private func airpodsPressed(_ m: Bool) {
         muteLog.info("stem press muted=\(m, privacy: .public) app muted=\(self.muted, privacy: .public) session=\(self.wanted != nil, privacy: .public)")
-        guard wanted != nil, m != muted else { return }  // the mute-state observer runs for the app's lifetime
+        guard wanted != nil, m != muted else { return }  // the observer outlives sessions
         Task { try? await setMuted(m, source: "earphone") }
     }
 
-    /// A tap on the Live Activity's button, with the chime as the only sign of it off the page. Ignored when
-    /// it's that way already: a tap on Apple Watch arrives twice.
+    /// Live Activity button; the chime is the only feedback off the page. A no-op if already in that state, since
+    /// an Apple Watch tap arrives twice.
     func setMutedOffPage(_ m: Bool) async {
         guard wanted != nil, m != muted, (try? await setMuted(m, source: "user")) != nil else { return }
-        if !speakerOff { chime.play(muted: m) }  // speaker off: not a sound
+        if !speakerOff { chime.play(muted: m) }
     }
 
-    // MARK: - The speaker
+    // MARK: - Speaker
 
     @discardableResult
     func setSpeaker(off: Bool, source: String) throws -> Bool {
@@ -420,22 +412,20 @@ final class VoiceSession: NSObject {
         if source != "call" { callQuiet.settle() }
         speakerOff = off
         playAgent()
-        if let r = room, connection == "connected" { Task { await tellSpeaker(r) } }  // else join tells it
+        if let r = room, connection == "connected" { Task { await tellSpeaker(r) } }  // else join does
         emit("speaker", ["off": off, "source": source])
         return off
     }
 
-    /// Tells the agent the speaker switch through our participant attribute, if it doesn't have it already.
     private func tellSpeaker(_ r: Room) async {
         let want = speakerOff ? "off" : "on"
         guard room === r, r.localParticipant.attributes[Self.speakerKey] != want else { return }
         do { try await r.localParticipant.set(attributes: [Self.speakerKey: want]) } catch {
             return NSLog("JarvisAudio: speaker \(want): \(error)")
         }
-        if speakerOff != (want == "off") { await tellSpeaker(r) }  // switched again meanwhile: catch up
+        if speakerOff != (want == "off") { await tellSpeaker(r) }  // switched again meanwhile
     }
 
-    /// The agent's voice at full volume, or silent with the speaker off.
     private func playAgent() {
         guard let r = room else { return }
         for p in r.remoteParticipants.values {
@@ -445,8 +435,7 @@ final class VoiceSession: NSObject {
 
     // MARK: - Phone calls
 
-    /// A call came in (or went out): the mic and the speaker go off, so JARVIS neither hears the call nor speaks over
-    /// it. When the last one ends, the page offers them back as they were (CallQuiet).
+    /// See CallQuiet.
     private func callChanged(_ onCall: Bool) {
         guard wanted != nil else { return }
         if onCall {
@@ -456,14 +445,13 @@ final class VoiceSession: NSObject {
             if !speakerOff { _ = try? setSpeaker(off: true, source: "call") }
             if !muted { Task { try? await setMuted(true, source: "call") } }
         } else {
-            Task {  // after the mute above, for a call that ended as soon as it rang
+            Task {  // after the mute task above, for a call that ended as soon as it rang
                 guard let offer = callQuiet.ended(current) else { return }
                 emit("call", ["state": "ended", "restore": Self.fields(offer)])
             }
         }
     }
 
-    /// The page's answer to the offer after a call: put the mic and speaker back as they were, or leave them off.
     func restoreAfterCall(_ restore: Bool) async {
         guard let was = callQuiet.settle(), restore else { return }
         if was.speakerOff != speakerOff { _ = try? setSpeaker(off: was.speakerOff, source: "user") }
@@ -476,9 +464,8 @@ final class VoiceSession: NSObject {
 
     private static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
-    /// Switches the mic track to what the page shows (MicSync.target): after every mute, interruption and
-    /// (re)connect, so a mute made while reconnecting or during a call still stops the mic. `force` switches it even
-    /// when LiveKit says it's already that way. False if the track couldn't be switched.
+    /// Switches the track to MicSync.target after every mute, interruption and (re)connect. `force` ignores
+    /// LiveKit's own idea of the track state. False if the switch failed.
     @discardableResult
     private func applyMic(force: Bool = false) async -> Bool {
         guard let r = room, connection == "connected", let on = MicSync.target(muted: muted, interrupted: interrupted) else { return true }
@@ -486,14 +473,13 @@ final class VoiceSession: NSObject {
         switching += 1
         let ok = await micOn(r, on)
         switching -= 1
-        // The mute or the interruption changed while it switched: catch up.
+        // State changed while switching: catch up.
         if ok, room === r, let next = MicSync.target(muted: muted, interrupted: interrupted), next != on { return await applyMic() }
         return ok
     }
 
-    /// LiveKit muted or unmuted the mic track. Switches made here are no news; any other (the server muting the
-    /// track, or LiveKit stopping a mic that failed) is followed, so the page never says Listening while nothing
-    /// is sent, and a track that comes back on while the user has it muted is muted again.
+    /// A track mute change we didn't make (server mute, LiveKit stopping a failed mic) is followed, so the page
+    /// never says Listening while nothing is sent; a track that comes back on while muted is muted again.
     private func trackMuteChanged(_ isMuted: Bool) {
         guard switching == 0, connection == "connected", sync.settled(at: Self.now) else { return }
         if !isMuted, muted {
@@ -509,18 +495,17 @@ final class VoiceSession: NSObject {
         }
     }
 
-    /// The server heard this device's mic, so it's live and sending, whatever the app thought.
     private func micHeard() {
         let fix = sync.heard(at: Self.now, muted: muted, interrupted: interrupted)
         if fix.interruptionOver {
-            interruptionOver("the mic is heard")  // switches the track off again too if it's muted
+            interruptionOver("the mic is heard")  // also re-mutes the track if needed
         } else if fix.muteAgain {
             muteLog.info("mic heard while muted: muting it again")
             Task { await applyMic(force: true) }
         }
     }
 
-    // MARK: - The audio session
+    // MARK: - Audio session
 
     private func audioEvent(_ e: AudioRouting.Event) {
         guard wanted != nil else { return }
@@ -532,7 +517,7 @@ final class VoiceSession: NSObject {
             emit("interruption", ["state": "began"])
             summaryChanged()
         case .interruptionEnded:
-            // Take the audio back even without shouldResume: JARVIS is a call the user left running.
+            // Even without shouldResume: JARVIS is a call the user left running.
             routing.reactivate()
             interruptionOver("ended")
         case .routeChanged(let output, let input, let reason):
@@ -540,16 +525,14 @@ final class VoiceSession: NSObject {
             if let input { d["input"] = input }
             emit("route", d)
         case .mediaServicesReset:
-            // The audio daemon restarted: everything audio is gone, an interruption with it. Set the session up
-            // again and rejoin.
+            // The audio daemon restarted and took everything (interruption included) with it: set up and rejoin.
             if (try? routing.activate()) != nil, interrupted { interruptionOver("media services reset") }
             if let r = room { drop(r) }
             retryLater()
         }
     }
 
-    /// The call, Siri or alarm is over: the page stops saying "Mic paused", and the mic comes back unless the user
-    /// muted it meanwhile (the switch on is forced, as the input may need it to start again).
+    /// The mic comes back unless muted meanwhile; forced, as the input may need it to restart.
     private func interruptionOver(_ why: String) {
         if interrupted {
             NSLog("JarvisAudio: interruption over (\(why))")
@@ -561,16 +544,15 @@ final class VoiceSession: NSObject {
         Task { await applyMic(force: true) }
     }
 
-    /// iOS doesn't promise an end to every interruption it starts, and one that never comes would leave the page
-    /// saying "Mic paused" for good. So when the app comes back on screen, or the user unmutes, it asks for the
-    /// audio again: if iOS hands it over, nothing holds it any more. (While a call is on, iOS refuses.) The other
-    /// way out is the server hearing the mic (micHeard).
+    /// iOS doesn't always report an interruption's end, which would leave "Mic paused" up for good. So on foreground
+    /// or unmute, ask for the audio again: iOS grants it only if nothing holds it (it refuses during a call). The
+    /// other way out is micHeard.
     private func takeAudioBack(_ why: String) {
         guard interrupted, wanted != nil else { return }
         if routing.reactivate() { interruptionOver(why) }
     }
 
-    // MARK: - Voice levels for the reactor, only while on screen
+    // MARK: - Voice levels for the reactor, only while in the foreground
 
     @objc private func appActive() {
         takeAudioBack("app active")
@@ -585,7 +567,7 @@ final class VoiceSession: NSObject {
                 guard let self, let r = self.room, UIApplication.shared.applicationState == .active else { break }
                 let agent = r.remoteParticipants.values.first { $0.kind == .agent }
                 let now = [self.muted ? 0 : Double(r.localParticipant.audioLevel), Double(agent?.audioLevel ?? 0)]
-                if now != sent {  // the page keeps the last levels, so repeats (mostly silence) needn't cross the bridge
+                if now != sent {  // skip repeats (mostly silence); the page keeps the last levels
                     self.emit("levels", ["mic": now[0], "agent": now[1]])
                     sent = now
                 }
@@ -595,15 +577,13 @@ final class VoiceSession: NSObject {
         }
     }
 
-    // MARK: - Outside the page: the lock screen
+    // MARK: - Live Activity
 
-    /// What the session is doing, for the user, or nil with no session.
     var summary: SessionSummary? {
         SessionSummary(active: wanted != nil, connection: connection, agentState: agentState, muted: muted, interrupted: interrupted)
     }
 
-    /// Called after every change to the connection, the agent's state, the mute or an interruption: the one
-    /// place that keeps the app's Live Activity, the one surface outside the page, up to date.
+    /// Call after every change to connection, agent state, mute or interruption.
     private func summaryChanged() {
         SessionControls.changed(summary, startedAt: startedAt)
     }
@@ -618,8 +598,8 @@ extension VoiceSession: RoomDelegate {
         Task { @MainActor in
             guard self.room === room else { return }
             self.setConnection("connected", reason: nil)
-            await self.applyMic()  // a mute while it was reconnecting
-            await self.tellSpeaker(room)  // and the speaker
+            await self.applyMic()  // changes made while reconnecting
+            await self.tellSpeaker(room)
         }
     }
 
@@ -645,12 +625,12 @@ extension VoiceSession: RoomDelegate {
 
     nonisolated func room(_ room: Room, participant: RemoteParticipant, didSubscribeTrack publication: RemoteTrackPublication) {
         guard publication.kind == .audio else { return }
-        Task { @MainActor in if self.room === room { self.playAgent() } }  // silent from its first word with the speaker off
+        Task { @MainActor in if self.room === room { self.playAgent() } }  // silent from the first word with the speaker off
     }
 
     nonisolated func room(_ room: Room, participantDidDisconnect participant: RemoteParticipant) {
         guard participant.kind == .agent else { return }
-        Task { @MainActor in  // as the page does: JARVIS leaving ends the session
+        Task { @MainActor in  // as on the page, JARVIS leaving ends the session
             guard self.room === room else { return }
             self.leaving = .agentLeft
             await room.disconnect()

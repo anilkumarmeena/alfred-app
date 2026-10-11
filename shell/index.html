@@ -8,12 +8,12 @@
 <link rel="stylesheet" href="shell.css">
 </head>
 <body>
-<!-- First run, or after "Change server": the one page bundled in the app. Everything else is the live page on the Mac. -->
+<!-- First run or "Change server": the only bundled page; everything else is the live page served by JARVIS. -->
 <form id="setup" class="card" autocomplete="off">
   <h1>J.A.R.V.I.S.</h1>
-  <p>Where is JARVIS? Use the Mac's Tailscale address, the one you'd open in Safari.</p>
+  <p>Where is JARVIS? Use the JARVIS computer's Tailscale address, the one you'd open in a browser.</p>
   <input id="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"
-    placeholder="https://your-mac.your-tailnet.ts.net" aria-label="Server address" required>
+    placeholder="https://your-computer.your-tailnet.ts.net" aria-label="Server address" required>
   <button type="submit">Connect</button>
   <p id="error" role="alert"></p>
   <p class="hint">You can change it later: on iPhone in Settings → JARVIS, on Android by long-pressing the app icon.</p>

@@ -1,4 +1,4 @@
-/* The two bundled pages, in the live page's colours so the hand-over doesn't flash. */
+/* The live page's colours, so the hand-over doesn't flash. */
 html, body { margin: 0; height: 100%; background: #04070c; color: #d8f3ff; }
 body {
   display: flex; align-items: center; justify-content: center;

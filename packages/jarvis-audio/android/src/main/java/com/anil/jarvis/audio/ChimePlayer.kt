@@ -9,7 +9,7 @@ import com.anil.jarvis.audio.core.Chime
 /** Plays the earphone cue on the call's route, so it comes out of the headset that was pressed. */
 object ChimePlayer {
     private const val RATE = 24_000
-    private val tracks = mutableMapOf<Boolean, AudioTrack>()  // one static track per cue, built on first use
+    private val tracks = mutableMapOf<Boolean, AudioTrack>()  // one static track per cue
 
     fun play(muted: Boolean) {
         try {

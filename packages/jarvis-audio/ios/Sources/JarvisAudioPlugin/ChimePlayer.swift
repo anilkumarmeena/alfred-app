@@ -1,7 +1,7 @@
 import AVFoundation
 import JarvisAudioCore
 
-/// Plays the earphone cue (JarvisAudioCore.Chime) on the session's route, over whatever JARVIS is saying.
+/// Plays the earphone cue on the session's route, over whatever JARVIS is saying.
 @MainActor
 final class ChimePlayer {
     private lazy var players: [Bool: AVAudioPlayer] = {

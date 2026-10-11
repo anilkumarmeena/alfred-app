@@ -47,12 +47,10 @@ import java.io.IOException
 import java.util.concurrent.CopyOnWriteArraySet
 
 /**
- * JARVIS's voice session, run natively: the same LiveKit room the page would join (a token from jarvis.web's
- * /api/token, then the agent's room), with the mic, JARVIS's voice, captions, agent state and typed messages.
- * It lives in the process, not the activity, and [VoiceService] keeps the process in the foreground while a
- * session is wanted, so the mic keeps going with the screen off. The plugin forwards what happens to the page.
+ * The native LiveKit session the page would otherwise join. Lives in the process, not the activity, and
+ * [VoiceService] keeps the process in the foreground so the mic survives the screen going off.
  *
- * Everything here runs on the main thread.
+ * Main thread only.
  */
 object VoiceSession {
     private const val TAG = "JarvisAudio"
@@ -60,12 +58,12 @@ object VoiceSession {
     private const val CHAT = "lk.chat"
     private const val AGENT_STATE = "lk.agent.state"
     private const val SEGMENT_ID = "lk.segment_id"
-    private const val SPEAKER = "jarvis.speaker"  // our attribute: "off" and the agent makes no speech at all
+    private const val SPEAKER = "jarvis.speaker"  // "off": the agent makes no speech at all
     private const val LEVELS_MS = 100L
 
     fun interface Listener { fun onEvent(name: String, data: JSObject) }
 
-    /** A failure the page is told about, with one of the codes in the plugin's TypeScript definitions. */
+    /** [code] is one of the plugin's TypeScript error codes. */
     class Failure(val code: String, message: String, val retryable: Boolean = false) : Exception(message)
 
     private data class Wanted(val server: ServerAddress, val passcode: String, val device: String)
@@ -75,14 +73,13 @@ object VoiceSession {
     private val listeners = CopyOnWriteArraySet<Listener>()
     private lateinit var app: Context
 
-    // What the session should be: set from start() until it ends. `generation` changes whenever it does, so
-    // work begun for an older session (a token fetch, a retry) drops its result.
+    // `generation` bumps whenever `wanted` changes, so work begun for an older session drops its result.
     private var wanted: Wanted? = null
     private var generation = 0
 
     private var room: Room? = null
     private var roomJob: Job? = null
-    private var leaving: DisconnectCause? = null  // set when the agent left, so the room ending isn't retried
+    private var leaving: DisconnectCause? = null  // set when the agent left, so the disconnect isn't retried
     private val outbox = ArrayDeque<String>()
     private var captions = Captions()
     private val policy = ReconnectPolicy()
@@ -91,26 +88,26 @@ object VoiceSession {
     private var levelsJob: Job? = null
     private var network: ConnectivityManager.NetworkCallback? = null
     private val presses = EarphoneDebouncer()
-    private var sync = MicSync()  // keeps the mic track and the mute / interruption the page shows in step
-    private var switching = 0  // mic track switches in flight: the room's reports of them aren't news
+    private var sync = MicSync()
+    private var switching = 0  // our own mic switches in flight; the room's reports of them are ignored
     private var calls: CallWatch? = null
-    private var callQuiet = CallQuiet()  // a call turns the mic and speaker off, and offers them back after
+    private var callQuiet = CallQuiet()
 
     var connection = "disconnected"; private set
     var agentState: String? = null; private set
     var muted = false; private set
     /**
-     * Speaker off: JARVIS replies only in the transcript. The agent makes no speech (told in the token, then by our
-     * participant attribute), and its track plays at volume 0, so a reply already being spoken stops at once.
+     * Text-only replies. The agent is told via the token and then our participant attribute; its track also plays at
+     * volume 0 so a reply already being spoken stops at once.
      */
     var speakerOff = false; private set
-    var interrupted = false; private set  // a call or another app has the mic for now
+    var interrupted = false; private set  // a call or another app holds audio focus
     var startedAt: Long? = null; private set
     var route: String? = null; private set
     val active: Boolean get() = wanted != null
-    private val agentReady: Boolean get() = agentState != null && agentState != "initializing"  // lk.chat reaches it
+    private val agentReady: Boolean get() = agentState != null && agentState != "initializing"  // lk.chat is heard
 
-    /** The app is on screen: only then are voice levels worth sending. Set by the plugin. */
+    /** Voice levels are only sent while the app is on screen. */
     var foreground = true
         set(value) {
             field = value
@@ -135,7 +132,7 @@ object VoiceSession {
 
     // --- Starting and ending ---
 
-    /** Joins, or re-reports a session that's already running with the same settings (the page reloaded). */
+    /** Joins, or just reports status if the same session is already running (the page reloaded). */
     suspend fun start(context: Context, server: ServerAddress, passcode: String, device: String, startMuted: Boolean,
                       startSilent: Boolean = false): JSObject {
         app = context.applicationContext
@@ -148,8 +145,8 @@ object VoiceSession {
         speakerOff = startSilent
         sync = MicSync()
         callQuiet = CallQuiet()
-        calls = CallWatch(app) { callChanged(it) }.also { it.start() }  // a call already on quiets it from the start
-        VoiceService.start(app)  // now, while the app is in the foreground, as Android 14 requires for the mic
+        calls = CallWatch(app) { callChanged(it) }.also { it.start() }
+        VoiceService.start(app)  // while in the foreground: Android 14+ refuses a mic service started from background
         watchNetwork()
         try {
             join(gen, first = true)
@@ -165,7 +162,6 @@ object VoiceSession {
         end("hangup", null)
     }
 
-    /** Back to no session: leave the room, stop retrying, let the service go. */
     private fun end(reason: String, message: String?, quiet: Boolean = false) {
         wanted = null
         generation++
@@ -221,7 +217,7 @@ object VoiceSession {
             throw Failure("SERVER", "Couldn't join the session: ${e.message ?: e}", retryable = true)
         }
         if (gen != generation || room !== r) return
-        for (p in r.remoteParticipants.values) if (p.kind == Participant.Kind.AGENT) agentChanged(p.attributes[AGENT_STATE])  // there before us
+        for (p in r.remoteParticipants.values) if (p.kind == Participant.Kind.AGENT) agentChanged(p.attributes[AGENT_STATE])  // joined before us
         if (!muted && !interrupted && !micOn(r, true)) {
             throw Failure("NO_MICROPHONE", "The microphone couldn't start. Allow it for JARVIS in Settings, then try again.")
         }
@@ -229,8 +225,8 @@ object VoiceSession {
         if (startedAt == null) startedAt = System.currentTimeMillis()
         setConnection("connected", null)
         startLevels()
-        applyMic()  // a mute or a call while it joined
-        tellSpeaker(r)  // and the speaker
+        applyMic()  // catch up on changes made while joining
+        tellSpeaker(r)
     }
 
     private suspend fun fetchToken(w: Wanted): Grant {
@@ -256,8 +252,8 @@ object VoiceSession {
             is RoomEvent.Reconnecting -> setConnection("reconnecting", "network")
             is RoomEvent.Reconnected -> {
                 setConnection("connected", null)
-                scope.launch { applyMic() }  // a mute or a call while it was reconnecting
-                tellSpeaker(r)  // and the speaker
+                scope.launch { applyMic() }  // catch up on changes made while reconnecting
+                tellSpeaker(r)
             }
             is RoomEvent.TrackSubscribed -> if (e.track is RemoteAudioTrack) playAgent()  // silent from its first word
             is RoomEvent.ActiveSpeakersChanged ->
@@ -298,11 +294,11 @@ object VoiceSession {
         when (cause) {
             DisconnectCause.AGENT_LEFT -> end("agentLeft", "JARVIS ended the session. Tap the core to reconnect.")
             DisconnectCause.CLIENT_INITIATED -> end("hangup", null)
-            else -> end("server", "The session was closed on the Mac. Tap the core to reconnect.")
+            else -> end("server", "The session was closed on the JARVIS computer. Tap the core to reconnect.")
         }
     }
 
-    // --- Reconnecting: a fresh token and a fresh room, until it works or the session is no longer wanted ---
+    // --- Reconnecting: fresh token and room, until it works or the session is no longer wanted ---
 
     private fun retryLater() {
         attempt++
@@ -331,7 +327,7 @@ object VoiceSession {
         val cm = app.getSystemService(ConnectivityManager::class.java) ?: return
         val cb = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(n: Network) {
-                main.post {  // back online while waiting to retry: go now
+                main.post {  // back online while waiting to retry: retry now
                     val job = retryJob ?: return@post
                     if (!job.isActive || room != null) return@post
                     job.cancel()
@@ -409,13 +405,11 @@ object VoiceSession {
 
     suspend fun setMuted(m: Boolean, source: String): Boolean {
         requireSession()
-        if (source != "call") callQuiet.settle()  // the user chose: no offer to put it back after a call
+        if (source != "call") callQuiet.settle()  // the user chose, so drop the after-call offer
         muted = m
         sync.changed(SystemClock.elapsedRealtime())
-        // Unmuting from the screen while "Mic paused": if no phone call holds the audio any more, that's over.
         if (!m && interrupted && source == "user") takeAudioBack("unmuted")
-        // The track follows now. With no room yet (reconnecting), join and Reconnected apply it; with a call
-        // holding the mic it stays off until the call is over.
+        // With no room yet, join/Reconnected apply it; during a call it stays off until the call ends.
         val opened = applyMic()
         if (!opened && !m) {
             muted = true  // couldn't open the mic: stay muted and say so
@@ -430,9 +424,8 @@ object VoiceSession {
     }
 
     /**
-     * Switches the mic track to what the page shows ([MicSync.target]): after every mute, interruption and
-     * (re)connect, so a mute made while reconnecting still stops the mic. [force] switches it even when LiveKit
-     * says it's already that way. False if the track couldn't be switched.
+     * Switches the mic track to [MicSync.target]. [force] switches even if LiveKit says it's already that way.
+     * False if the track couldn't be switched.
      */
     private suspend fun applyMic(force: Boolean = false): Boolean {
         val r = room ?: return true
@@ -441,15 +434,14 @@ object VoiceSession {
         if (!force && r.localParticipant.isMicrophoneEnabled == on) return true
         switching++
         val ok = try { micOn(r, on) } finally { switching-- }
-        // The mute or the interruption changed while it switched: catch up.
+        // State changed while switching: catch up.
         if (ok && room === r && MicSync.target(muted, interrupted) != on) return applyMic()
         return ok
     }
 
     /**
-     * LiveKit muted or unmuted the mic track. Switches made here are no news; any other (the server muting the
-     * track, or LiveKit stopping a mic that failed) is followed, so the page never says Listening while nothing is
-     * sent, and a track that comes back on while it should be off is switched off again.
+     * Follows mic track mutes we didn't make (server mute, a failed mic) so the page never shows Listening while
+     * nothing is sent, and switches off a track that comes back on while it should be off.
      */
     private fun trackMuteChanged(isMuted: Boolean) {
         if (switching > 0 || connection != "connected" || !sync.settled(SystemClock.elapsedRealtime())) return
@@ -466,25 +458,24 @@ object VoiceSession {
         }
     }
 
-    /** A headset button press, from [VoiceService]'s media session: a toggle, with the chime. */
+    /** A headset button press from [VoiceService]'s media session: toggles mute, with the chime. */
     fun earphonePress() {
         if (wanted == null || !presses.accept(SystemClock.elapsedRealtime())) return
         scope.launch {
             val m = try { setMuted(!muted, "earphone") } catch (f: Failure) { return@launch }
-            if (!speakerOff) ChimePlayer.play(m)  // speaker off: not a sound
+            if (!speakerOff) ChimePlayer.play(m)
         }
     }
 
     /**
-     * A tap on the notification's Mute or Unmute (on the phone, or a watch it's mirrored to), with the chime as the
-     * only sign of it off the page. It asks for a state rather than a toggle, as the iOS Live Activity does, so a
-     * tap delivered twice can't undo itself: ignored when it's that way already.
+     * The notification's Mute/Unmute (also from a mirrored watch). Sets a state rather than toggling, as the iOS Live
+     * Activity does, so a tap delivered twice can't undo itself.
      */
     fun setMutedOffPage(m: Boolean) {
         if (wanted == null || m == muted) return
         scope.launch {
             try { setMuted(m, "user") } catch (f: Failure) { return@launch }
-            if (!speakerOff) ChimePlayer.play(m)  // speaker off: not a sound
+            if (!speakerOff) ChimePlayer.play(m)
         }
     }
 
@@ -500,14 +491,12 @@ object VoiceSession {
         return off
     }
 
-    /** Tells the agent the speaker switch through our participant attribute, if it doesn't have it already. */
     private fun tellSpeaker(r: Room) {
         val want = if (speakerOff) "off" else "on"
         if (room !== r || r.localParticipant.attributes[SPEAKER] == want) return
         try { r.localParticipant.updateAttributes(mapOf(SPEAKER to want)) } catch (e: Exception) { Log.w(TAG, "speaker $want", e) }
     }
 
-    /** The agent's voice at full volume, or silent with the speaker off. */
     private fun playAgent() {
         val r = room ?: return
         for (p in r.remoteParticipants.values) {
@@ -517,10 +506,7 @@ object VoiceSession {
 
     // --- Phone calls ---
 
-    /**
-     * A call is ringing or on ([CallWatch]): the mic and the speaker go off, so JARVIS neither hears the call nor
-     * speaks over it. When it ends, the page offers them back as they were ([CallQuiet]).
-     */
+    /** During a call the mic and speaker go off, so JARVIS neither hears it nor speaks over it ([CallQuiet]). */
     private fun callChanged(onCall: Boolean) {
         if (wanted == null) return
         if (onCall) {
@@ -535,7 +521,6 @@ object VoiceSession {
         }
     }
 
-    /** The page's answer to the offer after a call: put the mic and speaker back as they were, or leave them off. */
     suspend fun restoreAfterCall(restore: Boolean) {
         val was = callQuiet.settle() ?: return
         if (!restore) return
@@ -547,9 +532,8 @@ object VoiceSession {
 
     private fun fields(s: CallQuiet.State) = JSObject().put("muted", s.muted).put("speakerOff", s.speakerOff)
 
-    /** Audio focus: a phone call (transient loss) takes the mic until it's over. */
     private fun focusChanged(change: Int) {
-        calls?.check()  // before Android 12 the only sign of a call ringing, starting or ending
+        calls?.check()  // below Android 12 the only signal of a call starting or ending
         when (change) {
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> interrupt(true)
             AudioManager.AUDIOFOCUS_GAIN -> if (interrupted) interrupt(false)
@@ -558,9 +542,8 @@ object VoiceSession {
     }
 
     /**
-     * Android doesn't promise the audio focus back after every transient loss, and one that never comes would leave
-     * the page saying "Mic paused" for good. So when the app comes on screen, or the user unmutes, and no phone call
-     * is ringing or going on ([MicSync.callHoldsAudio]), the interruption is over and the mic comes back.
+     * Android doesn't always return audio focus after a transient loss, which would leave "Mic paused" stuck. So on
+     * coming on screen or unmuting with no call holding the audio ([MicSync.callHoldsAudio]), the interruption ends.
      */
     private fun takeAudioBack(why: String) {
         if (!interrupted || wanted == null) return
@@ -593,7 +576,7 @@ object VoiceSession {
                 val r = room ?: break
                 val agent = r.remoteParticipants.values.firstOrNull { it.kind == Participant.Kind.AGENT }
                 val now = (if (muted) 0.0 else r.localParticipant.audioLevel.toDouble()) to (agent?.audioLevel?.toDouble() ?: 0.0)
-                if (now != sent) {  // the page keeps the last levels, so repeats (mostly silence) needn't cross the bridge
+                if (now != sent) {  // the page keeps the last levels; skip repeats (mostly silence)
                     emit("levels", JSObject().put("mic", now.first).put("agent", now.second))
                     sent = now
                 }
@@ -610,6 +593,5 @@ object VoiceSession {
         else -> "unknown"
     }
 
-    /** What the session is doing, for the notification, or null with no session. */
     val summary: SessionSummary? get() = SessionSummary.of(wanted != null, connection, agentState, muted, interrupted)
 }

@@ -5,10 +5,8 @@ import JarvisAudioCore
 import UserNotifications
 import WebKit
 
-/// The page's handle on VoiceSession, and the server address setting. Method and event names match
-/// src/definitions.ts. Starting a session also registers for JARVIS's notifications (PushNotifications), and a
-/// tapped notification opens its page here. Links to jarvis-app://retry and jarvis-app://setup (the bundled error page) are handled
-/// here too, and navigation to the saved server is allowed, since its host is only known at run time.
+/// The page's bridge to VoiceSession and the server address setting; names match src/definitions.ts. Also
+/// handles jarvis-app://retry and jarvis-app://setup from the bundled error page.
 @objc(JarvisAudioPlugin)
 public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "JarvisAudioPlugin"
@@ -40,7 +38,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    // MARK: - The session
+    // MARK: - Session
 
     @objc func start(_ call: CAPPluginCall) {
         guard let passcode = call.getString("passcode"), !passcode.isEmpty else {
@@ -81,7 +79,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         reply(call, "muted") { try await VoiceSession.shared.setMuted(!VoiceSession.shared.muted, source: "user") }
     }
 
-    /// Resolves with `[key: change()]`, the new state, or rejects with the session's failure.
+    /// Resolves with `[key: change()]` or rejects with the session's failure.
     private func reply(_ call: CAPPluginCall, _ key: String, _ change: @escaping @MainActor () async throws -> Bool) {
         Task { @MainActor in
             do { call.resolve([key: try await change()]) } catch let f as VoiceSession.Failure {
@@ -92,13 +90,13 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    /// Speaker off: JARVIS replies in text only, with no speech made at all.
+    /// Speaker off: JARVIS replies in text only, with no speech synthesized.
     @objc func setSpeaker(_ call: CAPPluginCall) {
         guard let off = call.getBool("off") else { return call.reject("Say off: true or false.") }
         reply(call, "off") { try VoiceSession.shared.setSpeaker(off: off, source: "user") }
     }
 
-    /// The answer to the offer after a phone call: `restore` puts the mic and speaker back as they were before it.
+    /// The user's answer to the post-call offer to restore the mic and speaker.
     @objc func restoreAfterCall(_ call: CAPPluginCall) {
         let restore = call.getBool("restore") ?? false
         Task { @MainActor in
@@ -130,7 +128,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         Task { @MainActor in call.resolve(VoiceSession.shared.micMode.state) }
     }
 
-    /// Opens iOS's Mic Mode picker. Apps can't set the mode themselves; the user picks it there.
+    /// Apps can't set the mode themselves; this opens the system picker.
     @objc func showMicModes(_ call: CAPPluginCall) {
         Task { @MainActor in
             VoiceSession.shared.micMode.show()
@@ -138,7 +136,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    // MARK: - The server address
+    // MARK: - Server address
 
     @objc func getServerUrl(_ call: CAPPluginCall) {
         let saved = ServerSettings.saved
@@ -164,7 +162,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         loadSetup()
     }
 
-    /// Loads the page in the running web view. The next launch starts there directly (MainViewController).
+    /// The next launch starts there directly (MainViewController).
     private func load(_ url: URL) {
         DispatchQueue.main.async { [weak self] in _ = self?.bridge?.webView?.load(URLRequest(url: url)) }
     }
@@ -187,7 +185,7 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             return true  // cancel the jarvis-app:// navigation itself
         }
-        // The saved server's host, which capacitor.config.json's allowNavigation can't know in advance.
+        // allowNavigation in capacitor.config.json can't know the saved host in advance.
         if let host = url.host?.lowercased(), host == ServerSettings.current?.host { return false }
         return nil
     }
@@ -206,7 +204,6 @@ public class JarvisAudioPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    /// JARVIS's alerts: heartbeat and background tasks, pushed through APNs.
     private static func notificationState() async -> String {
         switch await UNUserNotificationCenter.current().notificationSettings().authorizationStatus {
         case .authorized, .provisional, .ephemeral: return "granted"

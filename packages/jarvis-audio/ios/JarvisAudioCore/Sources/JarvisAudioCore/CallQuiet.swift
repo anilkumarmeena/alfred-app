@@ -1,8 +1,7 @@
 import Foundation
 
-/// A phone call (or any CallKit call: FaceTime, WhatsApp…) turns JARVIS's mic and speaker off, so nothing of the call
-/// is heard by JARVIS and JARVIS says nothing over it. When the last call ends, the user is offered the mic and the
-/// speaker back as they were before it, if that's any different; VoiceSession asks the page, which shows the offer.
+/// Any CallKit call (phone, FaceTime, WhatsApp…) turns JARVIS's mic and speaker off so it neither hears the call nor
+/// talks over it. When the last call ends, the page offers to restore the pre-call state if it differs.
 public struct CallQuiet: Equatable, Sendable {
     public struct State: Equatable, Sendable {
         public var muted: Bool
@@ -15,13 +14,12 @@ public struct CallQuiet: Equatable, Sendable {
     }
 
     private var before: State?  // as it was when the first call came in, until the last one ends
-    /// What to offer to put back, from the end of the call until the user answers or changes either themselves.
+    /// Open from the call's end until the user answers or changes the mic or speaker themselves.
     public private(set) var offer: State?
 
     public init() {}
 
-    /// A call is ringing or on, as the session is `now`. True the first time, when the mic and speaker go off; a
-    /// second call during the first changes nothing.
+    /// True only for the first concurrent call, when the mic and speaker should go off.
     public mutating func began(_ now: State) -> Bool {
         offer = nil
         guard before == nil else { return false }
@@ -29,7 +27,7 @@ public struct CallQuiet: Equatable, Sendable {
         return true
     }
 
-    /// The last call ended, leaving the session `now`: what to offer to put back, or nil if it's as it was before.
+    /// The last call ended: the state to offer back, or nil if `now` already matches it.
     public mutating func ended(_ now: State) -> State? {
         guard let was = before else { return nil }
         before = nil
@@ -37,8 +35,7 @@ public struct CallQuiet: Equatable, Sendable {
         return offer
     }
 
-    /// The user answered the offer, or set the mic or speaker themselves: the offer is closed. Returns it, if one was
-    /// open.
+    /// Closes the offer (answered, or the user changed the mic or speaker) and returns it if one was open.
     @discardableResult
     public mutating func settle() -> State? {
         defer { offer = nil }

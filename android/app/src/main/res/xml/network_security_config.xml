@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- JARVIS is reached over Tailscale Serve's HTTPS address. Plain http is allowed only for local development:
-     the Mac itself through `adb reverse` (localhost) and the emulator's alias for the Mac (10.0.2.2). -->
+<!-- HTTPS (Tailscale Serve) only, except for local development: `adb reverse` (localhost) and the emulator's
+     alias for the host (10.0.2.2). -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">

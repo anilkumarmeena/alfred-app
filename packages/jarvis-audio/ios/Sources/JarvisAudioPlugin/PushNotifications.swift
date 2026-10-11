@@ -4,13 +4,9 @@ import JarvisAudioCore
 import UIKit
 import UserNotifications
 
-/// JARVIS's notifications in the app: heartbeat alerts and background tasks that finish, fail or have a question.
-/// The page's Web Push doesn't work in an app's web view, so the app registers with APNs itself and hands the
-/// device token to jarvis.web (/api/push/native) whenever a voice session starts, when it has the passcode.
-/// iOS shows the pushes with the app closed; tapping one opens its page (/?task=3) on the JARVIS server.
-///
-/// The app's AppDelegate calls `install()` at launch, so a tap that launched the app isn't missed, and forwards
-/// the APNs token with Capacitor's .capacitorDidRegisterForRemoteNotifications notification.
+/// APNs notifications, since Web Push doesn't work in an app's web view. The token goes to jarvis.web when a
+/// voice session starts (that's when the passcode is known); a tap opens the notification's page on the server.
+/// AppDelegate calls `install()` at launch so a tap that launched the app isn't missed.
 @MainActor
 public final class PushNotifications: NSObject {
     public static let shared = PushNotifications()
@@ -21,13 +17,13 @@ public final class PushNotifications: NSObject {
         let device: String
     }
 
-    /// Loads a page in the web view: set by the plugin once the bridge is up. A tap before that waits for it.
+    /// Set by the plugin once the bridge is up; a tap before that waits in `pending`.
     var open: ((URL) -> Void)? {
         didSet { if let open, let url = pending { pending = nil; open(url) } }
     }
     private var pending: URL?
 
-    private var target: Target?  // where the token goes: the latest session's server and passcode
+    private var target: Target?  // the latest session's server and passcode
     private var token: String?
     private var sent: Target?  // the target the current token was last handed to
     private var sending = false
@@ -42,7 +38,6 @@ public final class PushNotifications: NSObject {
         nc.addObserver(self, selector: #selector(failed(_:)), name: .capacitorDidFailToRegisterForRemoteNotifications, object: nil)
     }
 
-    /// Asks for permission the first time, then for the APNs token, which goes to the server once it comes.
     func register(server: ServerAddress, passcode: String, device: String) {
         install()
         target = Target(server: server, passcode: passcode, device: device)
@@ -55,7 +50,7 @@ public final class PushNotifications: NSObject {
             } catch {
                 return NSLog("JarvisAudio: notification permission: \(error)")
             }
-            // Every time, as Apple asks: the token can change, and iOS answers quickly with the current one.
+            // Every time, per Apple: the token can change.
             UIApplication.shared.registerForRemoteNotifications()
         }
     }
@@ -68,19 +63,18 @@ public final class PushNotifications: NSObject {
     }
 
     @objc private func failed(_ n: Notification) {
-        // Most often: the app was signed without the Push Notifications capability (aps-environment).
+        // Usually: signed without the Push Notifications capability (aps-environment).
         NSLog("JarvisAudio: APNs registration failed: \(String(describing: n.object))")
     }
 
-    /// Hands the token over, unless this server already has it from this launch. A refusal or a network failure
-    /// is tried again when the next session starts.
+    /// Skipped if this target already has the token this launch; failures retry at the next session start.
     private func send() {
         guard !sending, let token, let target, sent != target else { return }
         sending = true
         Task {
             defer {
                 sending = false
-                if self.target != target { send() }  // a new session, maybe with another server, started meanwhile
+                if self.target != target { send() }  // a new session started meanwhile
             }
             var req = URLRequest(url: target.server.pushURL, timeoutInterval: 15)
             req.httpMethod = "POST"
@@ -103,7 +97,6 @@ public final class PushNotifications: NSObject {
         }
     }
 
-    /// Which APNs server this build's token is for, from how it was signed.
     private static let environment: String = {
         let profile = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision").flatMap { try? Data(contentsOf: $0) }
         return PushRegistration.environment(provisioningProfile: profile)
@@ -116,7 +109,7 @@ public final class PushNotifications: NSObject {
 }
 
 extension PushNotifications: UNUserNotificationCenterDelegate {
-    /// With the app on screen, show it too: the page may be on another view, or JARVIS's voice elsewhere.
+    /// Show in the foreground too: the page may be on another view.
     public nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
