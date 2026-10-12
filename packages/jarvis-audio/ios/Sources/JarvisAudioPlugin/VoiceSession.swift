@@ -61,6 +61,7 @@ final class VoiceSession: NSObject {
     /// volume 0, so a reply already being spoken stops at once.
     private(set) var speakerOff = false
     private(set) var interrupted = false  // a call, Siri or an alarm holds the audio
+    private var engineWaiting = false  // started during a call that held the audio: LiveKit's engine is held back
     private(set) var startedAt: Date?
     var active: Bool { wanted != nil }
     private var agentReady: Bool { agentState != nil && agentState != "initializing" }  // lk.chat would reach it
@@ -103,14 +104,22 @@ final class VoiceSession: NSObject {
         guard await AVAudioApplication.requestRecordPermission() else {
             throw Failure(code: "NO_MICROPHONE", message: "Microphone access is blocked. Allow it for JARVIS in Settings, then try again.")
         }
+        let onCall = calls.onCall
+        var audioHeld = false
         do { try routing.activate() } catch {
-            throw Failure(code: "NO_MICROPHONE", message: "The audio session couldn't start: \(error.localizedDescription)")
+            // A call holds the audio until it ends; anything else is a real failure.
+            guard onCall else {
+                routing.deactivate()
+                throw Failure(code: "NO_MICROPHONE", message: "The audio session couldn't start: \(error.localizedDescription)")
+            }
+            audioHeld = true
         }
         wanted = w
         generation += 1
         let gen = generation
         muted = startMuted
         speakerOff = startSilent
+        if onCall { startDuringCall(audioHeld: audioHeld) }
         sync = MicSync()
         micMode.sessionStarted()
         // Match iOS's mute to ours before the engine opens the mic.
@@ -124,6 +133,8 @@ final class VoiceSession: NSObject {
             if gen == generation { end(reason: Self.reason(for: f.code), message: f.message) }
             throw f
         }
+        // Again now it's connected: the page clears "Mic paused" when the session goes live.
+        if gen == generation, interrupted { emit("interruption", ["state": "began"]) }
         return status()
     }
 
@@ -139,6 +150,7 @@ final class VoiceSession: NSObject {
         if let r = room { drop(r) }  // the levels loop stops itself with no room
         path?.cancel(); path = nil
         connection = "disconnected"; agentState = nil; muted = false; interrupted = false; startedAt = nil
+        releaseEngine()
         callQuiet = CallQuiet()
         attempt = 0; outbox.removeAll()
         airpods.setSystemMuted(false)  // iOS keeps it across sessions otherwise
@@ -445,9 +457,52 @@ final class VoiceSession: NSObject {
             if !speakerOff { _ = try? setSpeaker(off: true, source: "call") }
             if !muted { Task { try? await setMuted(true, source: "call") } }
         } else {
+            reclaimAudio()
             Task {  // after the mute task above, for a call that ended as soon as it rang
                 guard let offer = callQuiet.ended(current) else { return }
                 emit("call", ["state": "ended", "restore": Self.fields(offer)])
+            }
+        }
+    }
+
+    /// Started during a call: as a call during a session leaves it, muted with the speaker off, offered back when it
+    /// ends. If the call holds the audio, the room is joined without LiveKit's audio engine (typing and captions still
+    /// work), which starts once iOS hands the audio over (interruptionOver).
+    private func startDuringCall(audioHeld: Bool) {
+        NSLog("JarvisAudio: starting during a call: muted, speaker off\(audioHeld ? ", audio engine waiting" : "")")
+        _ = callQuiet.began(current)
+        muted = true
+        speakerOff = true
+        emit("mute", ["muted": true, "source": "call"])
+        emit("speaker", ["off": true, "source": "call"])
+        guard audioHeld else { return }
+        interrupted = true
+        do {
+            try AudioManager.shared.setEngineAvailability(.none)
+            engineWaiting = true
+        } catch {
+            NSLog("JarvisAudio: holding the audio engine: \(error)")
+        }
+    }
+
+    /// The audio engine may run again, starting whatever playback or recording the room asked for meanwhile.
+    private func releaseEngine() {
+        guard engineWaiting else { return }
+        engineWaiting = false
+        do { try AudioManager.shared.setEngineAvailability(.default) } catch {
+            NSLog("JarvisAudio: releasing the audio engine: \(error)")
+        }
+    }
+
+    /// The last call ended: ask for the audio back rather than wait for iOS's interruption end, which never comes for
+    /// a session started during the call, or for the app to come on screen. iOS can take a moment to let go of it.
+    private func reclaimAudio() {
+        let gen = generation
+        Task {
+            for _ in 0..<10 {
+                guard gen == generation, interrupted, !calls.onCall else { return }
+                takeAudioBack("call ended")
+                try? await Task.sleep(nanoseconds: 500_000_000)
             }
         }
     }
@@ -541,6 +596,7 @@ final class VoiceSession: NSObject {
             emit("interruption", ["state": "ended"])
             summaryChanged()
         }
+        releaseEngine()  // a session started during the call gets its audio now
         Task { await applyMic(force: true) }
     }
 

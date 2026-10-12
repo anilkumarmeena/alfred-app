@@ -11,6 +11,7 @@ final class CallWatch: NSObject, CXCallObserverDelegate {
 
     override init() {
         super.init()
+        onCall = observer.calls.contains { !$0.hasEnded }  // one already on when the app launched
         observer.setDelegate(self, queue: .main)
     }
 

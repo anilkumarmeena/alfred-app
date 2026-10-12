@@ -15,6 +15,7 @@ final class AudioRouting {
 
     var onEvent: ((Event) -> Void)?
     private var observers: [NSObjectProtocol] = []
+    private var configured = false  // category set since the last deactivate
     private let session = AVAudioSession.sharedInstance()
 
     #if swift(>=6.2)
@@ -23,15 +24,18 @@ final class AudioRouting {
     private static let bluetooth: AVAudioSession.CategoryOptions = [.allowBluetooth, .allowBluetoothA2DP]
     #endif
 
+    /// Throws while a phone call holds the audio; set up as far as it got, reactivate() finishes it after the call.
     func activate() throws {
         try session.setCategory(.playAndRecord, mode: .voiceChat, options: Self.bluetooth.union([.defaultToSpeaker, .allowAirPlay]))
-        try session.setActive(true)
+        configured = true
         observe()
+        try session.setActive(true)
     }
 
     func deactivate() {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
+        configured = false
         try? session.setActive(false, options: .notifyOthersOnDeactivation)
     }
 
@@ -39,7 +43,10 @@ final class AudioRouting {
     /// (call, Siri) still holds the audio.
     @discardableResult
     func reactivate() -> Bool {
-        do { try session.setActive(true); return true } catch {
+        do {
+            if configured { try session.setActive(true) } else { try activate() }
+            return true
+        } catch {
             NSLog("JarvisAudio: reactivate failed: \(error)")
             return false
         }
