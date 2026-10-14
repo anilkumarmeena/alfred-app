@@ -92,6 +92,8 @@ object VoiceSession {
     private var switching = 0  // our own mic switches in flight; the room's reports of them are ignored
     private var calls: CallWatch? = null
     private var callQuiet = CallQuiet()
+    private var audio: AudioSwitchHandler? = null  // the current room's: it takes audio focus and sets the mode
+    private var focusWaiting = false  // started during a call, which refused the audio focus: asked again after it
 
     var connection = "disconnected"; private set
     var agentState: String? = null; private set
@@ -145,6 +147,7 @@ object VoiceSession {
         speakerOff = startSilent
         sync = MicSync()
         callQuiet = CallQuiet()
+        if (MicSync.callHoldsAudio(app.getSystemService(AudioManager::class.java)?.mode ?: 0)) startDuringCall()
         calls = CallWatch(app) { callChanged(it) }.also { it.start() }
         VoiceService.start(app)  // while in the foreground: Android 14+ refuses a mic service started from background
         watchNetwork()
@@ -154,6 +157,8 @@ object VoiceSession {
             if (gen == generation) end(reasonFor(f.code), f.message)
             throw f
         }
+        // Again now it's connected: the page clears "Mic paused" when the session goes live.
+        if (gen == generation && interrupted) emit("interruption", JSObject().put("state", "began"))
         return status()
     }
 
@@ -171,6 +176,7 @@ object VoiceSession {
         unwatchNetwork()
         calls?.stop(); calls = null
         callQuiet = CallQuiet()
+        focusWaiting = false
         connection = "disconnected"; agentState = null; muted = false; speakerOff = false; interrupted = false; startedAt = null
         attempt = 0; outbox.clear()
         presses.reset()
@@ -181,7 +187,7 @@ object VoiceSession {
     }
 
     private fun dropRoom(r: Room) {
-        if (room === r) room = null
+        if (room === r) { room = null; audio = null }
         roomJob?.cancel(); roomJob = null
         try { r.disconnect() } catch (e: Exception) { Log.w(TAG, "disconnect", e) }
         try { r.release() } catch (e: Exception) { Log.w(TAG, "release", e) }
@@ -202,11 +208,11 @@ object VoiceSession {
         val grant = fetchToken(w)
         if (gen != generation) return
 
-        val audio = AudioSwitchHandler(app)
-        audio.registerOnAudioFocusChangeListener { change -> main.post { focusChanged(change) } }
-        audio.registerAudioDeviceChangeListener { _, selected -> main.post { routeChanged(selected?.name) } }
-        val r = LiveKit.create(app, overrides = LiveKitOverrides(audioOptions = AudioOptions(audioHandler = audio)))
-        room = r; leaving = null; agentState = null; captions = Captions()
+        val handler = AudioSwitchHandler(app)
+        handler.registerOnAudioFocusChangeListener { change -> main.post { focusChanged(change) } }
+        handler.registerAudioDeviceChangeListener { _, selected -> main.post { routeChanged(selected?.name) } }
+        val r = LiveKit.create(app, overrides = LiveKitOverrides(audioOptions = AudioOptions(audioHandler = handler)))
+        room = r; audio = handler; leaving = null; agentState = null; captions = Captions()
         roomJob = scope.launch { r.events.collect { onRoomEvent(r, it) } }
         r.registerTextStreamHandler(TRANSCRIPTION) { reader, from -> scope.launch { caption(r, reader, from.value) } }
 
@@ -516,9 +522,43 @@ object VoiceSession {
             if (!speakerOff) setSpeaker(true, "call")
             if (!muted) scope.launch { try { setMuted(true, "call") } catch (_: Failure) {} }
         } else {
+            reclaimAudio()
             val offer = callQuiet.ended(current()) ?: return
             emit("call", JSObject().put("state", "ended").put("restore", fields(offer)))
         }
+    }
+
+    /**
+     * Started during a call: as a call during a session leaves it, muted with the speaker off, offered back when it
+     * ends, and "Mic paused", since a phone call holds the audio (Android silences other apps' mic and refuses them
+     * the audio focus). The room is still joined, so typing and captions work.
+     */
+    private fun startDuringCall() {
+        Log.i(TAG, "starting during a call: muted, speaker off, mic paused")
+        callQuiet.began(current())  // so CallWatch's first report of this call changes nothing
+        muted = true
+        speakerOff = true
+        interrupted = true
+        focusWaiting = true
+        sync.changed(SystemClock.elapsedRealtime())
+        emit("mute", JSObject().put("muted", true).put("source", "call"))
+        emit("speaker", JSObject().put("off", true).put("source", "call"))
+    }
+
+    /**
+     * The call ended: take the audio back now, rather than wait for an audio focus that never comes back to a session
+     * started during the call (its request was refused), or for the app to come on screen. Restarting the room's
+     * audio handler asks for the focus and the communication mode again.
+     */
+    private fun reclaimAudio() {
+        if (focusWaiting) {
+            focusWaiting = false
+            audio?.let {  // with no room yet, joining asks for them
+                Log.i(TAG, "call ended: asking for the audio focus again")
+                try { it.stop(); it.start() } catch (e: Exception) { Log.w(TAG, "audio handler restart", e) }
+            }
+        }
+        takeAudioBack("call ended")
     }
 
     suspend fun restoreAfterCall(restore: Boolean) {
@@ -546,6 +586,7 @@ object VoiceSession {
      * coming on screen or unmuting with no call holding the audio ([MicSync.callHoldsAudio]), the interruption ends.
      */
     private fun takeAudioBack(why: String) {
+        calls?.check()  // a call that ended unnoticed (before Android 12, a session that never had the focus)
         if (!interrupted || wanted == null) return
         val mode = app.getSystemService(AudioManager::class.java)?.mode ?: return
         if (MicSync.callHoldsAudio(mode)) return

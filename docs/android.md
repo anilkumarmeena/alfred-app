@@ -100,7 +100,12 @@ back when it ends (the `call` event, `getStatus().afterCall`, `restoreAfterCall`
 
 - A call is detected from **`AudioManager`'s mode** (ringing, dialling or in a call), which **needs no permission**.
   Reading the phone state would need `READ_PHONE_STATE`.
-- Android 12+ reports each mode change; before that it's checked on every audio focus change.
+- Android 12+ reports each mode change; before that it's checked on every audio focus change, and whenever the
+  app comes on screen or the user unmutes.
+- **Starting a session during a call** works as on iOS: it joins **muted with the speaker off**, offered back when
+  the call ends, and shows **Mic paused**, since a phone call holds the audio. Typing and captions still work.
+- **When the call ends** the app takes the audio back at once, rather than waiting for the audio focus to return.
+  A session started during the call was refused the focus, so its audio handler is restarted to ask again.
 
 > [!NOTE]
 > Unlike iOS's CallKit, this **doesn't see other apps' internet calls** (WhatsApp, Meet), which use the same
