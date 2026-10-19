@@ -9,7 +9,7 @@
   const plugin = /** @type {any} */ (window).Capacitor?.Plugins?.JarvisAudio;
 
   if (!plugin) {
-    error.textContent = "This page only works inside the JARVIS app.";
+    error.textContent = "This page only works inside the Alfred app.";
     button.disabled = true;
     return;
   }

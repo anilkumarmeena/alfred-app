@@ -4,7 +4,7 @@
 
 # 🍎 iOS
 
-**How the Swift plugin (`packages/jarvis-audio/ios`) keeps a JARVIS session alive on the iPhone.**
+**How the Swift plugin (`packages/alfred-audio/ios`) keeps a Alfred session alive on the iPhone.**
 
 [🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · **🍎 iOS** · [🤖 Android](android.md) · [🔨 Build & test](build.md) · [📲 Install](install.md) · [🤝 Contributing](../CONTRIBUTING.md)
 
@@ -93,7 +93,7 @@ dimmed ⏮ ⏭ slots an app can't remove, and doubled up with the Live Activity.
 
 > [!NOTE]
 > The cost: the play/pause button of **wired EarPods and other Bluetooth headsets goes to the last media app**, not
-> JARVIS. AirPods use the stem press below.
+> Alfred. AirPods use the stem press below.
 
 ## 🎧 AirPods stem press
 
@@ -116,10 +116,10 @@ dimmed ⏮ ⏭ slots an app can't remove, and doubled up with the Live Activity.
 
 ## 🔇 Speaker off
 
-`setSpeaker`, `start({ speakerOff })`: **JARVIS replies only in the transcript.**
+`setSpeaker`, `start({ speakerOff })`: **Alfred replies only in the transcript.**
 
 - The plugin asks for it in `/api/token`'s request (`speaker: "off"`), so **the greeting is silent too**.
-- During a session it changes it with its `jarvis.speaker` participant attribute; the agent then makes **no speech
+- During a session it changes it with its `alfred.speaker` participant attribute; the agent then makes **no speech
   at all**.
 - The agent's track also plays at **volume 0**, so a reply already being spoken stops at once.
 - The Live Activity's mute plays no chime.
@@ -138,10 +138,10 @@ Android does both too: see [🤖 Android](android.md#-phone-calls).
 
 ## 📱 Live Activity
 
-`ios/App/App/SessionActivity.swift`, drawn by the **`JarvisWidget`** extension. During a session the **lock
+`ios/App/App/SessionActivity.swift`, drawn by the **`AlfredWidget`** extension. During a session the **lock
 screen, the Dynamic Island and the Apple Watch Smart Stack** show:
 
-- **JARVIS** and what it's doing: Listening, Muted, Speaking, Thinking, Connecting…, or Mic paused for a call
+- **Alfred** and what it's doing: Listening, Muted, Speaking, Thinking, Connecting…, or Mic paused for a call
   (`SessionSummary` in the core),
 - the session's running time,
 - **Mute/Unmute** and **Hang Up** buttons. Tapping elsewhere opens the app.
@@ -153,7 +153,7 @@ Mute plays the same falling or rising chime as the page.
 | ⌚ | The watch has its own small layout (`supplementalActivityFamilies`), so **the extension needs iOS 18** |
 | 👆 | A button tapped on the watch runs on the iPhone |
 | 🔀 | The plugin hands the app the summary through `SessionControls` |
-| 📄 | `ios/App/Shared/JarvisActivity.swift`, in both targets, holds the data and the buttons' intents |
+| 📄 | `ios/App/Shared/AlfredActivity.swift`, in both targets, holds the data and the buttons' intents |
 | 🎚️ | Mute asks for a state (`SetMutedIntent(muted:)`), **not a toggle** |
 
 - The plugin can't own the Activity itself: ActivityKit's types must be compiled into the extension too.
@@ -172,7 +172,7 @@ Mute plays the same falling or rising chime as the page.
 
 `MicMode.swift`. iOS's Mic Modes (Standard, **Voice Isolation**, Wide Spectrum) run inside Apple's voice
 processing, which the `.voiceChat` session and LiveKit's engine already use, so **Control Center offers Mic Mode
-for JARVIS while the mic is on.**
+for Alfred while the mic is on.**
 
 > [!NOTE]
 > **Apps can't set the mode.** Even in the iOS 27 SDK, `AVCaptureDevice.preferredMicrophoneMode` and
@@ -233,12 +233,12 @@ environment comes from the build's provisioning profile: `development` for Xcode
 **3. Open on tap** — a tapped notification opens its page, e.g. `/?task=3`, **on the saved server only**.
 
 > [!IMPORTANT]
-> Needs **APNs set up on the JARVIS computer** ([how](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#ios-push-on-the-computer)), and a **paid developer
+> Needs **APNs set up on the Alfred computer** ([how](https://github.com/anilkumarmeena/alfred/blob/master/docs/mobile.md#ios-push-on-the-computer)), and a **paid developer
 > team**: a Personal Team can't sign push.
 
 ## 🔧 Settings
 
-**Settings → JARVIS** (`ios/App/App/Settings.bundle`) has the server address.
+**Settings → Alfred** (`ios/App/App/Settings.bundle`) has the server address.
 
 ---
 

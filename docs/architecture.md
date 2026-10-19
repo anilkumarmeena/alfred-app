@@ -4,7 +4,7 @@
 
 # 🧱 Architecture
 
-**How the app reuses the live JARVIS page while a native plugin owns the voice session.**
+**How the app reuses the live Alfred page while a native plugin owns the voice session.**
 
 [🏠 Home](../README.md) · **🧱 Architecture** · [🍎 iOS](ios.md) · [🤖 Android](android.md) · [🔨 Build & test](build.md) · [📲 Install](install.md) · [🤝 Contributing](../CONTRIBUTING.md)
 
@@ -28,20 +28,20 @@
 ## 🧭 The big picture
 
 ```text
-┌──────────── phone app (Capacitor) ─────────────┐            ┌─────── JARVIS computer ──────┐
-│ WKWebView / Android WebView                    │  HTTPS     │ jarvis.web :8787             │
+┌──────────── phone app (Capacitor) ─────────────┐            ┌─────── Alfred computer ──────┐
+│ WKWebView / Android WebView                    │  HTTPS     │ alfred.web :8787             │
 │   the live page, https://<computer>.ts.net ────┼──────────▶ │   /  /static/*  /api/token   │
-│   (web/ in the jarvis repo, with lib/native.ts)│ Tailscale  │                              │
-│        │ JarvisAudio.start / setMuted / events │  Serve     │ LiveKit :7880 (/rtc)         │
-│        ▼                                       │            │   room jarvis-xxxx           │
-│ JarvisAudio plugin (Swift / Kotlin)            │  WebRTC    │     ▲                        │
-│   LiveKit native SDK: mic → Opus, agent voice ─┼──────────▶ │     └─ jarvis/voice/agent.py │
+│   (web/ in the alfred repo, with lib/native.ts)│ Tailscale  │                              │
+│        │ AlfredAudio.start / setMuted / events │  Serve     │ LiveKit :7880 (/rtc)         │
+│        ▼                                       │            │   room alfred-xxxx           │
+│ AlfredAudio plugin (Swift / Kotlin)            │  WebRTC    │     ▲                        │
+│   LiveKit native SDK: mic → Opus, agent voice ─┼──────────▶ │     └─ alfred/voice/agent.py │
 │   AVAudioSession / foreground service          │ UDP 7882   │        Whisper → Claude →    │
 │   earphone button, interruptions, reconnects   │            │        Kokoro                │
 └────────────────────────────────────────────────┘            └──────────────────────────────┘
 ```
 
-How a session starts in the app. The agent (`jarvis/voice/agent.py`) sits in the LiveKit room, and `Web` is `jarvis.web`:
+How a session starts in the app. The agent (`alfred/voice/agent.py`) sits in the LiveKit room, and `Web` is `alfred.web`:
 
 ```mermaid
 sequenceDiagram
@@ -61,20 +61,20 @@ sequenceDiagram
 
 ## 🌐 What the page does today
 
-Read from the jarvis repo; **this repo doesn't change it.**
+Read from the alfred repo; **this repo doesn't change it.**
 
 | | Piece | How it works |
 |:-:|---|---|
-| 🏠 | **Served by** | `jarvis/server.py` on `127.0.0.1:8787` |
+| 🏠 | **Served by** | `alfred/server.py` on `127.0.0.1:8787` |
 | 🔐 | **Reached through** | Tailscale Serve only, at `https://<computer-name>.<tailnet>.ts.net` |
 | 🎫 | **Session** | POSTs `{"passcode", "device"}` to `/api/token` |
 | 📡 | **Room** | Joins with `livekit-client` at `wss://<same host>` |
 | 🎤 | **Mic** | WebRTC Opus track, 48 kHz, media over UDP 7882 |
-| 🔊 | **Voice** | Kokoro, spoken by `jarvis/voice/agent.py`, as the agent's audio track |
+| 🔊 | **Voice** | Kokoro, spoken by `alfred/voice/agent.py`, as the agent's audio track |
 | 🧠 | **Agent state** | The agent's `lk.agent.state` attribute |
 | 💬 | **Text** | Captions on `lk.transcription`, typed messages on `lk.chat` |
 
-- Browsers on the JARVIS computer itself use `http://localhost:8787`.
+- Browsers on the Alfred computer itself use `http://localhost:8787`.
 - It **never streams audio over a plain WebSocket**. `/api/token` returns a LiveKit token for a fresh room and a URL,
   `wss://<same host>`, which Tailscale Serve proxies at `/rtc` to LiveKit on port 7880.
 - The mic track has echo cancellation, noise suppression and auto gain on.
@@ -99,36 +99,36 @@ stays the UI: in the app it calls the plugin instead of opening its own `Room`, 
 
 ## 🔗 Server side
 
-**Nothing to patch.** The app needs a current JARVIS (`master`), served on the tailnet with `make tailscale-serve`.
-Everything the app relies on is already in the jarvis repo.
+**Nothing to patch.** The app needs a current Alfred (`master`), served on the tailnet with `make tailscale-serve`.
+Everything the app relies on is already in the alfred repo.
 
 | | Piece | Where |
 |:-:|---|---|
-| 🌉 | **The page's bridge** to the plugin | `web/src/lib/native.ts` in jarvis |
-| 🧩 | **The plugin contract** | `packages/jarvis-audio/src/definitions.ts` here |
+| 🌉 | **The page's bridge** to the plugin | `web/src/lib/native.ts` in alfred |
+| 🧩 | **The plugin contract** | `packages/alfred-audio/src/definitions.ts` here |
 | 🎫 | **Voice session** | `/api/token`, the same passcode as the browser |
 | 🔔 | **Push tokens** | `POST /api/push/native`: APNs on iPhone, FCM on Android |
 
-- **A change to the plugin API lands in both repos:** `definitions.ts` here and `native.ts` in jarvis.
-- The jarvis side of the native app: [📲 Native app](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#-native-app).
-- Push setup on the JARVIS computer: [iOS](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#ios-push-on-the-computer)
-  · [Android](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#android-push-on-the-computer).
+- **A change to the plugin API lands in both repos:** `definitions.ts` here and `native.ts` in alfred.
+- The alfred side of the native app: [📲 Native app](https://github.com/anilkumarmeena/alfred/blob/master/docs/mobile.md#-native-app).
+- Push setup on the Alfred computer: [iOS](https://github.com/anilkumarmeena/alfred/blob/master/docs/mobile.md#ios-push-on-the-computer)
+  · [Android](https://github.com/anilkumarmeena/alfred/blob/master/docs/mobile.md#android-push-on-the-computer).
 
 ### What the page sees
 
-In the app, the plugin is `window.Capacitor.Plugins.JarvisAudio`:
+In the app, the plugin is `window.Capacitor.Plugins.AlfredAudio`:
 
 ```ts
-await JarvisAudio.start({ serverUrl: location.origin, passcode, muted });  // same passcode as /api/token
-JarvisAudio.addListener("connection", ({ state, reason, message }) => …);  // connecting / connected / reconnecting / disconnected
-JarvisAudio.addListener("agentState", ({ state }) => …);                   // lk.agent.state
-JarvisAudio.addListener("mute", ({ muted, source }) => …);                 // source "earphone" for a button press
-JarvisAudio.addListener("transcript", ({ id, speaker, text, final }) => …);// whole line so far, per lk.segment_id
-JarvisAudio.addListener("interruption", ({ state }) => …);                 // a call took the mic, and gave it back
-await JarvisAudio.setMuted({ muted: true });
-await JarvisAudio.sendText({ text });                                       // lk.chat, held until the agent listens
-await JarvisAudio.getStatus();                                              // re-read everything when back on screen
-await JarvisAudio.stop();
+await AlfredAudio.start({ serverUrl: location.origin, passcode, muted });  // same passcode as /api/token
+AlfredAudio.addListener("connection", ({ state, reason, message }) => …);  // connecting / connected / reconnecting / disconnected
+AlfredAudio.addListener("agentState", ({ state }) => …);                   // lk.agent.state
+AlfredAudio.addListener("mute", ({ muted, source }) => …);                 // source "earphone" for a button press
+AlfredAudio.addListener("transcript", ({ id, speaker, text, final }) => …);// whole line so far, per lk.segment_id
+AlfredAudio.addListener("interruption", ({ state }) => …);                 // a call took the mic, and gave it back
+await AlfredAudio.setMuted({ muted: true });
+await AlfredAudio.sendText({ text });                                       // lk.chat, held until the agent listens
+await AlfredAudio.getStatus();                                              // re-read everything when back on screen
+await AlfredAudio.stop();
 ```
 
 There are more events (`speaker`, `call`, `route`, `quality`, `levels`, `micMode`) and methods; `definitions.ts` has
@@ -136,8 +136,8 @@ them all.
 
 ## 🚪 Loading the page
 
-- **`server.url`** in the Capacitor config points the web view at the JARVIS computer. The bridge works on the remote page, so
-  the plugin is on `window.Capacitor.Plugins.JarvisAudio` there.
+- **`server.url`** in the Capacitor config points the web view at the Alfred computer. The bridge works on the remote page, so
+  the plugin is on `window.Capacitor.Plugins.AlfredAudio` there.
 - **The address is set in the app, not baked in.** At launch `MainViewController` (iOS) and `MainActivity`
   (Android) put the saved address into Capacitor's config before the bridge starts.
 - **No address saved:** the app shows its one bundled page, `shell/index.html`, which asks for it.
@@ -148,16 +148,16 @@ them all.
 | Path | What |
 |---|---|
 | `capacitor.config.ts` | App id, `webDir: shell`, optional build-time `server.url`, `errorPath` |
-| `shell/` | Bundled pages: first-run address prompt, can't-reach-JARVIS page |
-| `packages/jarvis-audio/` | The plugin (TypeScript API, Swift, Kotlin) |
+| `shell/` | Bundled pages: first-run address prompt, can't-reach-Alfred page |
+| `packages/alfred-audio/` | The plugin (TypeScript API, Swift, Kotlin) |
 | `ios/`, `android/` | Native projects from `npx cap add`, with the changes below |
 | `scripts/` | Test and build helpers ([🔨 Build & test](build.md)) |
 
-- `capacitor.config.ts`: app id `com.anil.jarvis`; `server.url` comes from `JARVIS_SERVER_URL` at build time.
-- Inside `packages/jarvis-audio/`:
+- `capacitor.config.ts`: app id `com.anil.jarvis`; `server.url` comes from `ALFRED_SERVER_URL` at build time.
+- Inside `packages/alfred-audio/`:
   - `src/definitions.ts` is the TypeScript API,
-  - `ios/Sources/JarvisAudioPlugin` is the Swift plugin, `ios/JarvisAudioCore` its plain-Swift logic and tests,
-  - `android/src/main/java/com/anil/jarvis/audio` is the Kotlin plugin; `core/` there is the plain-Kotlin logic,
+  - `ios/Sources/AlfredAudioPlugin` is the Swift plugin, `ios/AlfredAudioCore` its plain-Swift logic and tests,
+  - `android/src/main/java/com/anil/alfred/audio` is the Kotlin plugin; `core/` there is the plain-Kotlin logic,
     tested in `android/src/test`.
 
 ## 🔧 Changes to the generated projects
@@ -169,7 +169,7 @@ them all.
 | Deployment target | iOS 17 |
 | `Info.plist` | Mic usage description, `UIBackgroundModes` `audio`,<br>`NSAllowsLocalNetworking`, local network usage description |
 | `MainViewController.swift` | Set in `Main.storyboard` |
-| `Settings.bundle` | The server address in Settings → JARVIS |
+| `Settings.bundle` | The server address in Settings → Alfred |
 | `App.entitlements` | `aps-environment` (the Push Notifications capability) |
 | `AppDelegate.swift` | Sets up `PushNotifications` and passes on the APNs token |
 

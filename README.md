@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/banner.svg" alt="JARVIS — your voice assistant, in your pocket" width="100%">
+<img src="docs/assets/banner.svg" alt="Alfred — your voice assistant, in your pocket" width="100%">
 
 <br>
 
@@ -8,7 +8,7 @@
 [![iOS 17+](https://img.shields.io/badge/iOS-17%2B-000000?style=flat-square&logo=apple&logoColor=white)](docs/ios.md)
 [![Android 8+](https://img.shields.io/badge/android-8.0%2B%20(API%2026)-3ddc84?style=flat-square&logo=android&logoColor=white)](docs/android.md)
 [![LiveKit](https://img.shields.io/badge/audio-LiveKit%20native%20SDKs-4fd1ff?style=flat-square)](docs/architecture.md)
-[![Swift · Kotlin · TypeScript](https://img.shields.io/badge/Swift%20·%20Kotlin%20·%20TS-555?style=flat-square)](packages/jarvis-audio)
+[![Swift · Kotlin · TypeScript](https://img.shields.io/badge/Swift%20·%20Kotlin%20·%20TS-555?style=flat-square)](packages/alfred-audio)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 **[Architecture](docs/architecture.md)** &nbsp;·&nbsp; **[Install](docs/install.md)** &nbsp;·&nbsp; **[Build & test](docs/build.md)** &nbsp;·&nbsp; **[Contributing](CONTRIBUTING.md)**
@@ -17,9 +17,9 @@
 
 ---
 
-The phone app for **JARVIS**, a personal voice assistant, built with **Capacitor**. It shows the **live JARVIS web
-page from the JARVIS computer**, so changes to the page in the jarvis repo show up **without rebuilding the app**. The voice
-session runs in a native plugin, **JarvisAudio**, not in the web view, so it **keeps going with the screen
+The phone app for **Alfred**, a personal voice assistant, built with **Capacitor**. It shows the **live Alfred web
+page from the Alfred computer**, so changes to the page in the alfred repo show up **without rebuilding the app**. The voice
+session runs in a native plugin, **AlfredAudio**, not in the web view, so it **keeps going with the screen
 locked**.
 
 <table>
@@ -28,7 +28,7 @@ locked**.
 
 ### 🔒 Locked, still listening
 
-The mic and JARVIS's voice keep going with the screen off or another app in front.
+The mic and Alfred's voice keep going with the screen off or another app in front.
 
 </td>
 <td width="33%" valign="top">
@@ -61,7 +61,7 @@ Keeps listening with the screen locked or another app in front, where a mobile b
 <td width="50%" valign="top">
 
 **🔊 Background voice**<br>
-JARVIS's replies keep playing while the app is in the background.
+Alfred's replies keep playing while the app is in the background.
 
 </td>
 </tr>
@@ -76,7 +76,7 @@ notification's controls.
 <td width="50%" valign="top">
 
 **🏝️ Live Activity**<br>
-Lock screen, Dynamic Island and Apple Watch show what JARVIS is doing, with **Mute** and **Hang Up**. Android uses
+Lock screen, Dynamic Island and Apple Watch show what Alfred is doing, with **Mute** and **Hang Up**. Android uses
 an ongoing-call notification (a **Live Update** on Android 16).
 
 </td>
@@ -91,7 +91,7 @@ Heartbeat alerts and background tasks arrive through **APNs** on iPhone and **Fi
 <td width="50%" valign="top">
 
 **📞 Call-aware**<br>
-A phone call mutes the mic and silences JARVIS, then offers both back when it ends.
+A phone call mutes the mic and silences Alfred, then offers both back when it ends.
 
 </td>
 </tr>
@@ -99,7 +99,7 @@ A phone call mutes the mic and silences JARVIS, then offers both back when it en
 <td width="50%" valign="top">
 
 **🔇 Speaker off**<br>
-JARVIS answers only in the transcript, with no speech at all.
+Alfred answers only in the transcript, with no speech at all.
 
 </td>
 <td width="50%" valign="top">
@@ -117,12 +117,12 @@ On iPhone, the app opens Apple's Mic Mode picker until you choose Voice Isolatio
 flowchart TB
     subgraph Phone["📱 Phone app (Capacitor)"]
         direction LR
-        Page["🌐 Live JARVIS page<br/>in the web view"]
-        Plugin["🎧 JarvisAudio plugin<br/>Swift / Kotlin"]
+        Page["🌐 Live Alfred page<br/>in the web view"]
+        Plugin["🎧 AlfredAudio plugin<br/>Swift / Kotlin"]
     end
-    subgraph Computer["🖥️ JARVIS computer"]
+    subgraph Computer["🖥️ Alfred computer"]
         direction LR
-        Web["🌐 jarvis.web<br/>:8787"]
+        Web["🌐 alfred.web<br/>:8787"]
         LK["📡 LiveKit<br/>:7880"]
         Agent["🧠 voice agent<br/>Whisper → Claude → Kokoro"]
     end
@@ -143,7 +143,7 @@ flowchart TB
 
 - **The page stays the UI.** In the app it calls the plugin instead of opening its own LiveKit `Room`.
 - **The plugin owns the connection**, because the web view's JavaScript is suspended in the background.
-- **Nothing to patch on the computer:** JARVIS already has the page's bridge, `/api/token` and the push endpoints.
+- **Nothing to patch on the computer:** Alfred already has the page's bridge, `/api/token` and the push endpoints.
 
 Full story in **[🧱 Architecture](docs/architecture.md)**.
 
@@ -151,7 +151,7 @@ Full story in **[🧱 Architecture](docs/architecture.md)**.
 
 > [!IMPORTANT]
 > Needs **Node 20+**, **Xcode 16.3+** on a Mac (for iOS and the LiveKit Swift package) and **Android Studio** with
-> JDK 21, plus a running **[JARVIS](https://github.com/anilkumarmeena/jarvis)** and **Tailscale** on both the JARVIS
+> JDK 21, plus a running **[Alfred](https://github.com/anilkumarmeena/alfred)** and **Tailscale** on both the Alfred
 > computer and the phone.
 
 **1. Install and sync** — builds the plugin's TypeScript, then `npx cap sync` for both platforms:
@@ -161,8 +161,8 @@ npm install
 npm run sync
 ```
 
-**2. Serve JARVIS on the tailnet** — run a current JARVIS (`master`), then on its computer
-([how](https://github.com/anilkumarmeena/jarvis/blob/master/docs/mobile.md#-get-it-on-your-phone)):
+**2. Serve Alfred on the tailnet** — run a current Alfred (`master`), then on its computer
+([how](https://github.com/anilkumarmeena/alfred/blob/master/docs/mobile.md#-get-it-on-your-phone)):
 
 ```sh
 make tailscale-serve
@@ -265,6 +265,6 @@ Setup, the checks a pull request must pass, and the code style.
 
 <img src="docs/assets/logo.svg" width="48" alt="">
 
-<sub>JARVIS on your phone · the page from the computer, the audio native</sub>
+<sub>Alfred on your phone · the page from the computer, the audio native</sub>
 
 </div>

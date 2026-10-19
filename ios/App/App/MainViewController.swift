@@ -1,8 +1,8 @@
 import Capacitor
-import JarvisAudioPlugin
+import AlfredAudioPlugin
 import UIKit
 
-// Points Capacitor at the JARVIS address saved in the app (first-run page or Settings → JARVIS), not only the
+// Points Capacitor at the Alfred address saved in the app (first-run page or Settings → Alfred), not only the
 // one baked into capacitor.config.json at build time.
 class MainViewController: CAPBridgeViewController {
     override func instanceDescriptor() -> InstanceDescriptor {

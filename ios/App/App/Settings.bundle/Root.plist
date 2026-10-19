@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Settings → JARVIS. The app reads these at launch (MainViewController, ServerSettings.swift). -->
+<!-- Settings → Alfred. The app reads these at launch (MainViewController, ServerSettings.swift). -->
 <plist version="1.0">
 <dict>
 	<key>PreferenceSpecifiers</key>
@@ -11,7 +11,7 @@
 			<key>Title</key>
 			<string>Server</string>
 			<key>FooterText</key>
-			<string>The JARVIS computer's Tailscale address, e.g. https://your-computer.your-tailnet.ts.net. Takes effect the next time JARVIS opens: swipe it away and open it again. Leave empty to be asked.</string>
+			<string>The Alfred computer's Tailscale address, e.g. https://your-computer.your-tailnet.ts.net. Takes effect the next time Alfred opens: swipe it away and open it again. Leave empty to be asked.</string>
 		</dict>
 		<dict>
 			<key>Type</key>

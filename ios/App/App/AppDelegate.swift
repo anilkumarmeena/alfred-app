@@ -1,6 +1,6 @@
 import UIKit
 import Capacitor
-import JarvisAudioPlugin
+import AlfredAudioPlugin
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -14,7 +14,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    // Forwarded the way Capacitor plugins expect; PushNotifications hands the token to jarvis.web.
+    // Forwarded the way Capacitor plugins expect; PushNotifications hands the token to alfred.web.
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
     }

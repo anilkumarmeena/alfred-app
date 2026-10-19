@@ -4,19 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>JARVIS</title>
+<title>Alfred</title>
 <link rel="stylesheet" href="shell.css">
 </head>
 <body>
-<!-- First run or "Change server": the only bundled page; everything else is the live page served by JARVIS. -->
+<!-- First run or "Change server": the only bundled page; everything else is the live page served by Alfred. -->
 <form id="setup" class="card" autocomplete="off">
-  <h1>J.A.R.V.I.S.</h1>
-  <p>Where is JARVIS? Use the JARVIS computer's Tailscale address, the one you'd open in a browser.</p>
+  <h1>Alfred</h1>
+  <p>Where is Alfred? Use the Alfred computer's Tailscale address, the one you'd open in a browser.</p>
   <input id="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false"
     placeholder="https://your-computer.your-tailnet.ts.net" aria-label="Server address" required>
   <button type="submit">Connect</button>
   <p id="error" role="alert"></p>
-  <p class="hint">You can change it later: on iPhone in Settings → JARVIS, on Android by long-pressing the app icon.</p>
+  <p class="hint">You can change it later: on iPhone in Settings → Alfred, on Android by long-pressing the app icon.</p>
 </form>
 <script src="setup.js"></script>
 </body>

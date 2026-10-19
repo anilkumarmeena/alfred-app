@@ -4,7 +4,7 @@
 
 # 🤖 Android
 
-**The same features as iOS, built from Android's own pieces in the Kotlin plugin (`packages/jarvis-audio/android`).**
+**The same features as iOS, built from Android's own pieces in the Kotlin plugin (`packages/alfred-audio/android`).**
 
 [🏠 Home](../README.md) · [🧱 Architecture](architecture.md) · [🍎 iOS](ios.md) · **🤖 Android** · [🔨 Build & test](build.md) · [📲 Install](install.md) · [🤝 Contributing](../CONTRIBUTING.md)
 
@@ -36,7 +36,7 @@
 | Live Activity (lock screen, Dynamic Island, Watch) | The session's **call-style notification**; a Live Update on Android 16 |
 | AirPods stem press | Headset buttons through a `MediaSession` |
 | APNs push | Firebase Cloud Messaging push |
-| Settings → JARVIS | Long-press the app icon → **Change server** |
+| Settings → Alfred | Long-press the app icon → **Change server** |
 | CallKit's `CXCallObserver` | `AudioManager`'s mode: the phone's own calls |
 | Mic Modes (Voice Isolation) | None: Android has no Mic Mode an app can read or offer |
 
@@ -57,7 +57,7 @@
 
 `VoiceService.kt` is **Android's Live Activity**. It shows:
 
-- **JARVIS** and what it's doing: Listening, Muted, Speaking, Thinking, Connecting…, or Mic paused for a call
+- **Alfred** and what it's doing: Listening, Muted, Speaking, Thinking, Connecting…, or Mic paused for a call
   (`SessionSummary` in the core, the same rules as iOS),
 - the session's running time,
 - **Mute/Unmute** and **Hang Up**. Tapping elsewhere opens the app.
@@ -70,7 +70,7 @@
 | 🚫 | **No media card** | No `MediaStyle`, for the same reason iOS has no Now Playing |
 | ⌚ | **Wear OS** | Doesn't mirror ongoing notifications, so it isn't on a watch |
 
-- With `CallStyle`, JARVIS is a call the user left running.
+- With `CallStyle`, Alfred is a call the user left running.
 - A Live Update sits at the top of the lock screen and shows as a chip in the status bar.
 
 ## 🎧 Headset buttons
@@ -90,7 +90,7 @@ mute with the chime**.
 `setSpeaker`, `start({ speakerOff })` **works as on iOS**:
 
 - `speaker: "off"` in the token request,
-- then the `jarvis.speaker` participant attribute,
+- then the `alfred.speaker` participant attribute,
 - the agent's track at volume 0, and no chime.
 
 ## 📞 Phone calls
@@ -109,7 +109,7 @@ back when it ends (the `call` event, `getStatus().afterCall`, `restoreAfterCall`
 
 > [!NOTE]
 > Unlike iOS's CallKit, this **doesn't see other apps' internet calls** (WhatsApp, Meet), which use the same
-> communication mode as JARVIS. Their audio focus still pauses the mic ("Mic paused").
+> communication mode as Alfred. Their audio focus still pauses the mic ("Mic paused").
 
 ## 📶 Mic sync and reconnects
 
@@ -118,7 +118,7 @@ back when it ends (the `call` event, `getStatus().afterCall`, `restoreAfterCall`
 
 ## 🔔 Notifications
 
-`PushNotifications.kt` and `JarvisMessagingService.kt`. **Heartbeat alerts** and **background tasks that finish,
+`PushNotifications.kt` and `AlfredMessagingService.kt`. **Heartbeat alerts** and **background tasks that finish,
 fail or have a question** come through FCM, so they show with the app closed.
 
 **1. Register** — when a session starts, the app gets its FCM token. It asks for notification permission the
@@ -126,14 +126,14 @@ first time, with the mic.
 
 **2. Post the token** — to `/api/push/native`, with the passcode, `"service": "fcm"` and its package name.
 
-**3. Show the alert** — the JARVIS computer sends **data messages**, which the app shows itself in an **Alerts** channel. A newer
+**3. Show the alert** — the Alfred computer sends **data messages**, which the app shows itself in an **Alerts** channel. A newer
 push with the same tag replaces the older one.
 
 **4. Open on tap** — a tapped notification opens its page, e.g. `/?task=3`, **on the saved server only**.
 
 > [!IMPORTANT]
 > Needs a **Firebase project**: `android/app/google-services.json` in the app (git-ignored), and that project's
-> service account on the JARVIS computer. See [📲 Install → Android notifications](install.md#-android-notifications-firebase).
+> service account on the Alfred computer. See [📲 Install → Android notifications](install.md#-android-notifications-firebase).
 > An app built without the file works the same, just with no alerts, and logs that once.
 
 ---

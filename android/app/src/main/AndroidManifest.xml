@@ -34,7 +34,7 @@
 
     </application>
 
-    <!-- Mic, foreground service, notification and Bluetooth permissions come from the JarvisAudio plugin's manifest. -->
+    <!-- Mic, foreground service, notification and Bluetooth permissions come from the AlfredAudio plugin's manifest. -->
 
     <uses-permission android:name="android.permission.INTERNET" />
 </manifest>

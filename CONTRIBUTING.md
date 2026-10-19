@@ -14,7 +14,7 @@
 
 > [!IMPORTANT]
 > You need **Node 20+**, **Xcode 16.3+** on a Mac for iOS, and **Android Studio** with JDK 21 for Android. To try the
-> app for real you also need a running **[JARVIS](https://github.com/anilkumarmeena/jarvis)** (current `master`) and
+> app for real you also need a running **[Alfred](https://github.com/anilkumarmeena/alfred)** (current `master`) and
 > Tailscale. Details are in **[🔨 Build & test](docs/build.md#-requirements)**.
 
 ## 🚀 Your first pull request
@@ -56,17 +56,17 @@ where it can be tested without a phone.
 
 - **Comments are short and explain why**, not what: the reason, the constraint or the trap. No history ("used to",
   "now") in comments; that belongs in the commit message.
-- **iOS and Android stay in parity.** A behaviour change lands in both `JarvisAudioCore` (Swift) and `core/`
+- **iOS and Android stay in parity.** A behaviour change lands in both `AlfredAudioCore` (Swift) and `core/`
   (Kotlin), with tests on both.
-- **The plugin API is a contract** with the page: change `packages/jarvis-audio/src/definitions.ts` together with
+- **The plugin API is a contract** with the page: change `packages/alfred-audio/src/definitions.ts` together with
   both native plugins.
 - **No personal data** in code, tests or docs: use placeholders like `https://your-computer.your-tailnet.ts.net`.
-- **Say "the computer", not "the Mac"**, unless it's really Mac-only (Xcode, iOS builds): JARVIS also runs on Linux
+- **Say "the computer", not "the Mac"**, unless it's really Mac-only (Xcode, iOS builds): Alfred also runs on Linux
   and Windows (WSL2).
 
 > [!NOTE]
 > The bundle id **`com.anil.jarvis`** is the project's own. For device builds, change it to yours (e.g.
-> `com.yourname.jarvis`) in Xcode's signing settings (the App and widget targets) and `applicationId` in
+> `com.yourname.alfred`) in Xcode's signing settings (the App and widget targets) and `applicationId` in
 > `android/app/build.gradle`; don't commit that change.
 
 ## 📬 Pull requests
@@ -79,13 +79,13 @@ where it can be tested without a phone.
 | 🧹 | **Focused commits** | Rebased on `master` before asking for review |
 
 > [!TIP]
-> **Changes to the web page or the server belong in the [jarvis repo](https://github.com/anilkumarmeena/jarvis)**:
+> **Changes to the web page or the server belong in the [alfred repo](https://github.com/anilkumarmeena/alfred)**:
 > the page's side of the plugin is `web/src/lib/native.ts` there. A plugin API change needs a pull request in both.
 
 ## 🐛 Reporting bugs
 
 Open an issue with **what you did**, **what you expected** and **what happened**, the phone and OS version, and the
-relevant log lines (Xcode's console or `adb logcat -s JarvisAudio`, with any personal details removed).
+relevant log lines (Xcode's console or `adb logcat -s AlfredAudio`, with any personal details removed).
 
 ---
 

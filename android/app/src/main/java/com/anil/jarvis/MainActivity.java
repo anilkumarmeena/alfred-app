@@ -2,7 +2,7 @@ package com.anil.jarvis;
 
 import android.content.Intent;
 import android.os.Bundle;
-import com.anil.jarvis.audio.ServerSettings;
+import com.anil.alfred.audio.ServerSettings;
 import com.getcapacitor.BridgeActivity;
 
 // Loads the page from the saved address (ServerSettings) rather than only capacitor.config.json's, and handles

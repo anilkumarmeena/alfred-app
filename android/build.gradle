@@ -21,7 +21,7 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }  // LiveKit's audioswitch fork, needed by the JarvisAudio plugin
+        maven { url 'https://jitpack.io' }  // LiveKit's audioswitch fork, needed by the AlfredAudio plugin
     }
 }
 

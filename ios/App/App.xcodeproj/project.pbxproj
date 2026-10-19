@@ -17,13 +17,13 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		7A11C0DE0000000000000002 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000001 /* MainViewController.swift */; };
 		7A11C0DE0000000000000004 /* Settings.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000003 /* Settings.bundle */; };
-		7A11C0DE0000000000000007 /* JarvisActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000006 /* JarvisActivity.swift */; };
-		7A11C0DE0000000000000008 /* JarvisActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000006 /* JarvisActivity.swift */; };
+		7A11C0DE0000000000000007 /* AlfredActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000006 /* AlfredActivity.swift */; };
+		7A11C0DE0000000000000008 /* AlfredActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000006 /* AlfredActivity.swift */; };
 		7A11C0DE000000000000000A /* SessionActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000009 /* SessionActivity.swift */; };
-		7A11C0DE000000000000000C /* JarvisWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000000000000000B /* JarvisWidgetBundle.swift */; };
-		7A11C0DE000000000000000E /* JarvisLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000000000000000D /* JarvisLiveActivity.swift */; };
-		7A11C0DE0000000000000011 /* JarvisWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000010 /* JarvisWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		7A11C0DE0000000000000020 /* JarvisAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A11C0DE000000000000001F /* JarvisAudioCore */; };
+		7A11C0DE000000000000000C /* AlfredWidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000000000000000B /* AlfredWidgetBundle.swift */; };
+		7A11C0DE000000000000000E /* AlfredLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000000000000000D /* AlfredLiveActivity.swift */; };
+		7A11C0DE0000000000000011 /* AlfredWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000010 /* AlfredWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7A11C0DE0000000000000020 /* AlfredAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A11C0DE000000000000001F /* AlfredAudioCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -32,7 +32,7 @@
 			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 7A11C0DE0000000000000014;
-			remoteInfo = JarvisWidget;
+			remoteInfo = AlfredWidget;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -43,7 +43,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				7A11C0DE0000000000000011 /* JarvisWidget.appex in Embed Foundation Extensions */,
+				7A11C0DE0000000000000011 /* AlfredWidget.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -64,12 +64,12 @@
 		7A11C0DE0000000000000001 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 		7A11C0DE0000000000000003 /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
 		7A11C0DE0000000000000005 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
-		7A11C0DE0000000000000006 /* JarvisActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarvisActivity.swift; sourceTree = "<group>"; };
+		7A11C0DE0000000000000006 /* AlfredActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredActivity.swift; sourceTree = "<group>"; };
 		7A11C0DE0000000000000009 /* SessionActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActivity.swift; sourceTree = "<group>"; };
-		7A11C0DE000000000000000B /* JarvisWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarvisWidgetBundle.swift; sourceTree = "<group>"; };
-		7A11C0DE000000000000000D /* JarvisLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarvisLiveActivity.swift; sourceTree = "<group>"; };
+		7A11C0DE000000000000000B /* AlfredWidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredWidgetBundle.swift; sourceTree = "<group>"; };
+		7A11C0DE000000000000000D /* AlfredLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredLiveActivity.swift; sourceTree = "<group>"; };
 		7A11C0DE000000000000000F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		7A11C0DE0000000000000010 /* JarvisWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = JarvisWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A11C0DE0000000000000010 /* AlfredWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AlfredWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,7 +85,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7A11C0DE0000000000000020 /* JarvisAudioCore in Frameworks */,
+				7A11C0DE0000000000000020 /* AlfredAudioCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,7 +98,7 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				7A11C0DE0000000000000012 /* Shared */,
-				7A11C0DE0000000000000013 /* JarvisWidget */,
+				7A11C0DE0000000000000013 /* AlfredWidget */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -107,7 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
-				7A11C0DE0000000000000010 /* JarvisWidget.appex */,
+				7A11C0DE0000000000000010 /* AlfredWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -134,19 +134,19 @@
 		7A11C0DE0000000000000012 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
-				7A11C0DE0000000000000006 /* JarvisActivity.swift */,
+				7A11C0DE0000000000000006 /* AlfredActivity.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
 		};
-		7A11C0DE0000000000000013 /* JarvisWidget */ = {
+		7A11C0DE0000000000000013 /* AlfredWidget */ = {
 			isa = PBXGroup;
 			children = (
-				7A11C0DE000000000000000B /* JarvisWidgetBundle.swift */,
-				7A11C0DE000000000000000D /* JarvisLiveActivity.swift */,
+				7A11C0DE000000000000000B /* AlfredWidgetBundle.swift */,
+				7A11C0DE000000000000000D /* AlfredLiveActivity.swift */,
 				7A11C0DE000000000000000F /* Info.plist */,
 			);
-			path = JarvisWidget;
+			path = AlfredWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -174,9 +174,9 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
-		7A11C0DE0000000000000014 /* JarvisWidget */ = {
+		7A11C0DE0000000000000014 /* AlfredWidget */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 7A11C0DE000000000000001B /* Build configuration list for PBXNativeTarget "JarvisWidget" */;
+			buildConfigurationList = 7A11C0DE000000000000001B /* Build configuration list for PBXNativeTarget "AlfredWidget" */;
 			buildPhases = (
 				7A11C0DE0000000000000015 /* Sources */,
 				7A11C0DE0000000000000016 /* Frameworks */,
@@ -186,12 +186,12 @@
 			);
 			dependencies = (
 			);
-			name = JarvisWidget;
+			name = AlfredWidget;
 			packageProductDependencies = (
-				7A11C0DE000000000000001F /* JarvisAudioCore */,
+				7A11C0DE000000000000001F /* AlfredAudioCore */,
 			);
-			productName = JarvisWidget;
-			productReference = 7A11C0DE0000000000000010 /* JarvisWidget.appex */;
+			productName = AlfredWidget;
+			productReference = 7A11C0DE0000000000000010 /* AlfredWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -225,14 +225,14 @@
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
-				7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/jarvis-audio/ios/JarvisAudioCore" */,
+				7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/alfred-audio/ios/AlfredAudioCore" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
-				7A11C0DE0000000000000014 /* JarvisWidget */,
+				7A11C0DE0000000000000014 /* AlfredWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -269,7 +269,7 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				7A11C0DE0000000000000002 /* MainViewController.swift in Sources */,
 				7A11C0DE000000000000000A /* SessionActivity.swift in Sources */,
-				7A11C0DE0000000000000007 /* JarvisActivity.swift in Sources */,
+				7A11C0DE0000000000000007 /* AlfredActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -277,9 +277,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7A11C0DE000000000000000C /* JarvisWidgetBundle.swift in Sources */,
-				7A11C0DE000000000000000E /* JarvisLiveActivity.swift in Sources */,
-				7A11C0DE0000000000000008 /* JarvisActivity.swift in Sources */,
+				7A11C0DE000000000000000C /* AlfredWidgetBundle.swift in Sources */,
+				7A11C0DE000000000000000E /* AlfredLiveActivity.swift in Sources */,
+				7A11C0DE0000000000000008 /* AlfredActivity.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -288,7 +288,7 @@
 /* Begin PBXTargetDependency section */
 		7A11C0DE000000000000001A /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 7A11C0DE0000000000000014 /* JarvisWidget */;
+			target = 7A11C0DE0000000000000014 /* AlfredWidget */;
 			targetProxy = 7A11C0DE0000000000000019 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -473,7 +473,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = JarvisWidget/Info.plist;
+				INFOPLIST_FILE = AlfredWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -495,7 +495,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				INFOPLIST_FILE = JarvisWidget/Info.plist;
+				INFOPLIST_FILE = AlfredWidget/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -532,7 +532,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		7A11C0DE000000000000001B /* Build configuration list for PBXNativeTarget "JarvisWidget" */ = {
+		7A11C0DE000000000000001B /* Build configuration list for PBXNativeTarget "AlfredWidget" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				7A11C0DE000000000000001C /* Debug */,
@@ -548,9 +548,9 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "CapApp-SPM";
 		};
-		7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/jarvis-audio/ios/JarvisAudioCore" */ = {
+		7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/alfred-audio/ios/AlfredAudioCore" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../packages/jarvis-audio/ios/JarvisAudioCore;
+			relativePath = ../../packages/alfred-audio/ios/AlfredAudioCore;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -560,10 +560,10 @@
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;
 			productName = "CapApp-SPM";
 		};
-		7A11C0DE000000000000001F /* JarvisAudioCore */ = {
+		7A11C0DE000000000000001F /* AlfredAudioCore */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/jarvis-audio/ios/JarvisAudioCore" */;
-			productName = JarvisAudioCore;
+			package = 7A11C0DE000000000000001E /* XCLocalSwiftPackageReference "../../packages/alfred-audio/ios/AlfredAudioCore" */;
+			productName = AlfredAudioCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

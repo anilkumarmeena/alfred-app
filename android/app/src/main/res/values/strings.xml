@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">JARVIS</string>
-    <string name="title_activity_main">JARVIS</string>
+    <string name="app_name">Alfred</string>
+    <string name="title_activity_main">Alfred</string>
     <string name="package_name">com.anil.jarvis</string>
     <string name="custom_url_scheme">com.anil.jarvis</string>
     <string name="shortcut_change_server">Change server</string>

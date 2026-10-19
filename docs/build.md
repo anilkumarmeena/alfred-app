@@ -47,7 +47,7 @@ npm run sync      # builds the plugin's TypeScript, then npx cap sync (both plat
 - To bake in a default address (the app's own setting still wins):
 
 ```sh
-JARVIS_SERVER_URL=https://<computer>.<tailnet>.ts.net npm run sync
+ALFRED_SERVER_URL=https://<computer>.<tailnet>.ts.net npm run sync
 ```
 
 ## 🍎 iOS
@@ -69,7 +69,7 @@ Maven Central and JitPack on the first sync. From a terminal:
 ```sh
 cd android
 ./gradlew assembleDebug                         # → app/build/outputs/apk/debug/app-debug.apk
-./gradlew :jarvis-audio:testDebugUnitTest       # the plugin's Kotlin unit tests
+./gradlew :alfred-audio:testDebugUnitTest       # the plugin's Kotlin unit tests
 ```
 
 > [!TIP]
@@ -81,7 +81,7 @@ cd android
 | | Command | What it runs |
 |:-:|---|---|
 | 📐 | `npm run typecheck` | TypeScript for the config, shell page and plugin API |
-| 🍎 | `npm run test:ios` | `swift test` for JarvisAudioCore |
+| 🍎 | `npm run test:ios` | `swift test` for AlfredAudioCore |
 | 🍎 | `npm run test:ios-direct` | The same tests with plain `swiftc` + `xctest` |
 | 🤖 | `npm run test:android` | The same logic in Kotlin, with JUnit through Gradle |
 | 🤖 | `npm run test:android-direct` | The Kotlin tests with Android Studio's `kotlinc`, no Gradle |
@@ -94,7 +94,7 @@ cd android
 - **`test:android-direct`** is for when Gradle can't fetch its plugins. It needs JUnit 4.13.2 and Hamcrest 1.3 in
   `~/.gradle`'s cache (any earlier Android build puts them there), and looks for Android Studio in `/Applications`
   unless `ANDROID_STUDIO` is set.
-- The page side (`web/src/lib/native.ts`) is tested in the jarvis repo, with its web tests.
+- The page side (`web/src/lib/native.ts`) is tested in the alfred repo, with its web tests.
 
 ## 📊 Status
 
@@ -110,7 +110,7 @@ cd android
 - The Android build is `./gradlew assembleDebug`, producing `app-debug.apk`.
 - Android hasn't run on a phone: the emulator can't start in the sandbox this was built in, and no phone was
   attached.
-- FCM needs your Firebase project (`google-services.json`, and its service account on the JARVIS computer).
+- FCM needs your Firebase project (`google-services.json`, and its service account on the Alfred computer).
 
 ## 📱 Things to check on a phone
 

@@ -1,5 +1,5 @@
 {
-  "originHash" : "732d79083a6842a73dac1c8da3a9195d65541536b7042c923de54e3128e391a3",
+  "originHash" : "527b42df6c6dd03e8edc8544538f5f829eb8e9b07629b143f7d30ddf4fed5d50",
   "pins" : [
     {
       "identity" : "capacitor-swift-pm",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/livekit/client-sdk-swift.git",
       "state" : {
-        "revision" : "f07831a7f06bca9e2fc2e136db591b7b42f16d8d",
-        "version" : "2.17.0"
+        "revision" : "93a7251057bdb6a80a7b1f6d11464d578ebdc09b",
+        "version" : "2.18.0"
       }
     },
     {
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/livekit/webrtc-xcframework.git",
       "state" : {
-        "revision" : "c73deceaddd9c07293871ae28f24d4326cc86d62",
-        "version" : "150.7871.2"
+        "revision" : "a41df9e9bcc7ab1d62131fda75c123ea391e5188",
+        "version" : "150.7871.3"
       }
     }
   ],

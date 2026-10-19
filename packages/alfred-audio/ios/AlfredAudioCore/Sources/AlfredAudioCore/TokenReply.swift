@@ -1,0 +1,62 @@
+import Foundation
+
+/// A LiveKit token from /api/token and the URL to join with it.
+public struct Grant: Equatable, Sendable {
+    public let token: String
+    public let url: String
+}
+
+/// Messages match the page's.
+public enum TokenError: Error, Equatable {
+    case unauthorized  // 401: wrong passcode
+    case rateLimited(String)  // 429: too many wrong passcodes lately
+    case server(String)  // anything else the server said no to
+    case badReply
+
+    public var message: String {
+        switch self {
+        case .unauthorized: return "Wrong passcode."
+        case .rateLimited(let m), .server(let m): return m
+        case .badReply: return "Couldn't reach Alfred."
+        }
+    }
+
+    /// As in the plugin's TypeScript definitions.
+    public var code: String {
+        switch self {
+        case .unauthorized: return "UNAUTHORIZED"
+        case .rateLimited: return "RATE_LIMITED"
+        case .server, .badReply: return "SERVER"
+        }
+    }
+
+    /// A server hiccup rather than a refusal.
+    public var isRetryable: Bool {
+        switch self {
+        case .unauthorized, .rateLimited: return false
+        case .server, .badReply: return true
+        }
+    }
+}
+
+public enum TokenReply {
+    /// `speakerOff`: Alfred replies in text only from the session's first word.
+    public static func body(passcode: String, device: String, speakerOff: Bool = false) -> Data {
+        let fields = ["passcode": passcode, "device": device, "speaker": speakerOff ? "off" : "on"]
+        return (try? JSONSerialization.data(withJSONObject: fields)) ?? Data()
+    }
+
+    public static func parse(status: Int, body: Data) -> Result<Grant, TokenError> {
+        let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+        let said = (json?["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        switch status {
+        case 200:
+            guard let token = json?["token"] as? String, !token.isEmpty,
+                  let url = json?["url"] as? String, !url.isEmpty else { return .failure(.badReply) }
+            return .success(Grant(token: token, url: url))
+        case 401: return .failure(.unauthorized)
+        case 429: return .failure(.rateLimited(said ?? "Too many wrong passcodes. Try again in a few minutes."))
+        default: return .failure(.server(said ?? "Couldn't reach Alfred (HTTP \(status))."))
+        }
+    }
+}
