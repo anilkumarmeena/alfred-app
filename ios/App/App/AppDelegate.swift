@@ -4,8 +4,7 @@ import AlfredAudioPlugin
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-
-    var window: UIWindow?
+    // The window, URL opens and Universal Links belong to SceneDelegate.
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Before launch finishes, so a notification tap that opened the app reaches the page.
@@ -27,15 +26,4 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Swiped away in the app switcher: iOS would leave the Live Activity up.
         SessionActivity.endBeforeQuit()
     }
-
-    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Keep: lets Capacitor's App API see URL opens.
-        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
-    }
-
-    func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Keep: lets Capacitor's App API see Universal Links.
-        return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
-    }
-
 }

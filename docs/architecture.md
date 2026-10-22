@@ -172,6 +172,7 @@ them all.
 | `Settings.bundle` | The server address in Settings → Alfred |
 | `App.entitlements` | `aps-environment` (the Push Notifications capability) |
 | `AppDelegate.swift` | Sets up `PushNotifications` and passes on the APNs token |
+| `SceneDelegate.swift` | The app's one window scene (iOS 27 won't launch an app built with its SDK without the scene life cycle); passes URL opens to Capacitor |
 
 `NSAllowsLocalNetworking` allows plain http only for localhost and LAN addresses; the real address is HTTPS.
 

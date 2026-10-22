@@ -24,6 +24,7 @@
 		7A11C0DE000000000000000E /* AlfredLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE000000000000000D /* AlfredLiveActivity.swift */; };
 		7A11C0DE0000000000000011 /* AlfredWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000010 /* AlfredWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7A11C0DE0000000000000020 /* AlfredAudioCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7A11C0DE000000000000001F /* AlfredAudioCore */; };
+		7A11C0DE0000000000000029 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A11C0DE0000000000000028 /* SceneDelegate.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +71,7 @@
 		7A11C0DE000000000000000D /* AlfredLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredLiveActivity.swift; sourceTree = "<group>"; };
 		7A11C0DE000000000000000F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		7A11C0DE0000000000000010 /* AlfredWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AlfredWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A11C0DE0000000000000028 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,6 +119,7 @@
 			children = (
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
+				7A11C0DE0000000000000028 /* SceneDelegate.swift */,
 				7A11C0DE0000000000000001 /* MainViewController.swift */,
 				7A11C0DE0000000000000009 /* SessionActivity.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -267,6 +270,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				7A11C0DE0000000000000029 /* SceneDelegate.swift in Sources */,
 				7A11C0DE0000000000000002 /* MainViewController.swift in Sources */,
 				7A11C0DE000000000000000A /* SessionActivity.swift in Sources */,
 				7A11C0DE0000000000000007 /* AlfredActivity.swift in Sources */,
